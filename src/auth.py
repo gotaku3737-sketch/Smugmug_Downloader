@@ -15,7 +15,7 @@ import os
 from requests_oauthlib import OAuth1Session
 from rich.console import Console
 
-from smugmug_downloader.config import (
+from src.config import (
     ACCESS_TOKEN_URL,
     AUTHORIZE_URL,
     REQUEST_TOKEN_URL,

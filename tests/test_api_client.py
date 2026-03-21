@@ -4,7 +4,7 @@ import json
 import pytest
 from unittest.mock import MagicMock, patch
 
-from smugmug_downloader.api_client import SmugMugClient, SmugMugAPIError
+from src.api_client import SmugMugClient, SmugMugAPIError
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ class TestRequest:
             client._request("GET", "/api/v2/nonexistent")
         assert exc_info.value.status_code == 404
 
-    @patch("smugmug_downloader.api_client.time.sleep")
+    @patch("src.api_client.time.sleep")
     def test_retry_on_server_error(self, mock_sleep, client, mock_session):
         """Should retry on 500 errors and succeed on subsequent attempt."""
         mock_session.request.side_effect = [
@@ -54,7 +54,7 @@ class TestRequest:
         assert result["Response"]["data"] == "ok"
         assert mock_session.request.call_count == 2
 
-    @patch("smugmug_downloader.api_client.time.sleep")
+    @patch("src.api_client.time.sleep")
     def test_retry_on_rate_limit(self, mock_sleep, client, mock_session):
         mock_session.request.side_effect = [
             make_response(429),
@@ -63,7 +63,7 @@ class TestRequest:
         result = client._request("GET", "/api/v2/test")
         assert result["Response"]["data"] == "ok"
 
-    @patch("smugmug_downloader.api_client.time.sleep")
+    @patch("src.api_client.time.sleep")
     def test_max_retries_exceeded(self, mock_sleep, client, mock_session):
         mock_session.request.side_effect = ConnectionError("timeout")
         with pytest.raises(SmugMugAPIError) as exc_info:

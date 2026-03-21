@@ -8,11 +8,11 @@ import sys
 
 from rich.console import Console
 
-from smugmug_downloader import __version__
-from smugmug_downloader.config import DEFAULT_OUTPUT_DIR, get_api_credentials
-from smugmug_downloader.auth import get_oauth_session
-from smugmug_downloader.api_client import SmugMugClient
-from smugmug_downloader.downloader import list_albums, show_status, run_download
+from src import __version__
+from src.config import DEFAULT_OUTPUT_DIR, get_api_credentials
+from src.auth import get_oauth_session
+from src.api_client import SmugMugClient
+from src.downloader import list_albums, show_status, run_download
 
 console = Console()
 
@@ -97,8 +97,8 @@ def main():
     # Handle --reset without needing auth
     if args.reset:
         output_dir = args.output_dir or DEFAULT_OUTPUT_DIR
-        from smugmug_downloader.tracker import DownloadTracker
-        from smugmug_downloader.config import STATE_FILENAME
+        from src.tracker import DownloadTracker
+        from src.config import STATE_FILENAME
 
         state_path = os.path.join(output_dir, STATE_FILENAME)
         tracker = DownloadTracker(state_path)

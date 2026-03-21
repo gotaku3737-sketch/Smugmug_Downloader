@@ -17,9 +17,9 @@ from rich.progress import (
 )
 from rich.table import Table
 
-from smugmug_downloader.api_client import SmugMugClient
-from smugmug_downloader.tracker import DownloadTracker
-from smugmug_downloader.config import STATE_FILENAME
+from src.api_client import SmugMugClient
+from src.tracker import DownloadTracker
+from src.config import STATE_FILENAME
 
 console = Console()
 

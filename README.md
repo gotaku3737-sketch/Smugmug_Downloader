@@ -18,7 +18,7 @@ Smugmug_Downloader/
 ├── main.py                          # Entry point
 ├── requirements.txt                 # Python dependencies
 ├── .env.example                     # API credential template
-├── smugmug_downloader/
+├── src/
 │   ├── __init__.py
 │   ├── config.py                    # Settings & credential resolution
 │   ├── auth.py                      # OAuth 1.0a flow with token caching
@@ -48,7 +48,7 @@ Set your credentials via **one of** these methods:
 | Method | How |
 |---|---|
 | **Environment variables** | `export SMUGMUG_API_KEY=... SMUGMUG_API_SECRET=...` |
-| **Static constants** | Edit `API_KEY` and `API_SECRET` at the top of `smugmug_downloader/config.py` |
+| **Static constants** | Edit `API_KEY` and `API_SECRET` at the top of `src/config.py` |
 | **Interactive prompt** | Just run the app — it will ask you |
 
 ## Usage

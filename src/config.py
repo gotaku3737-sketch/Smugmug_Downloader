@@ -69,7 +69,7 @@ def get_api_credentials():
     )
     console.print(
         "[dim]Tip: Set SMUGMUG_API_KEY and SMUGMUG_API_SECRET as environment "
-        "variables, or edit the constants in smugmug_downloader/config.py to "
+        "variables, or edit the constants in src/config.py to "
         "avoid this prompt.[/dim]\n"
     )
 

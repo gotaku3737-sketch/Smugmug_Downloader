@@ -5,7 +5,7 @@ import os
 import tempfile
 import pytest
 
-from smugmug_downloader.tracker import DownloadTracker
+from src.tracker import DownloadTracker
 
 
 @pytest.fixture

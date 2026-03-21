@@ -8,7 +8,7 @@ import time
 
 from rich.console import Console
 
-from smugmug_downloader.config import BASE_URL, API_ROOT, PAGE_SIZE, MAX_RETRIES, RETRY_BACKOFF
+from src.config import BASE_URL, API_ROOT, PAGE_SIZE, MAX_RETRIES, RETRY_BACKOFF
 
 console = Console()
 
@@ -236,7 +236,7 @@ class SmugMugClient:
         Returns:
             bool: True if download succeeded.
         """
-        from smugmug_downloader.config import CHUNK_SIZE
+        from src.config import CHUNK_SIZE
         import os
 
         for attempt in range(MAX_RETRIES):
