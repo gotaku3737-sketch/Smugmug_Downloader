@@ -73,9 +73,9 @@ def get_api_credentials():
         "avoid this prompt.[/dim]\n"
     )
 
-    api_key = console.input("[bold]Enter your SmugMug API Key: [/bold]").strip()
+    api_key = console.input("[bold]Enter your SmugMug API Key: [/bold]", password=True).strip()
     api_secret = console.input(
-        "[bold]Enter your SmugMug API Secret: [/bold]"
+        "[bold]Enter your SmugMug API Secret: [/bold]", password=True
     ).strip()
 
     if not api_key or not api_secret:
