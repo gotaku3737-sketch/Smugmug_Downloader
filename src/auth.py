@@ -95,7 +95,7 @@ def authorize(api_key, api_secret):
 
     # Step 3: User enters verification code
     verifier = console.input(
-        "[bold]Enter the 6-digit verification code: [/bold]"
+        "[bold]Enter the 6-digit verification code: [/bold]", password=True
     ).strip()
 
     if not verifier:
