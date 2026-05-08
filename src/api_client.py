@@ -183,7 +183,7 @@ class SmugMugClient:
             image_key (str): Image key (e.g., 'jPPKD2c').
 
         Returns:
-            tuple: (download_url, filename, file_size) or (None, None, None)
+            str: The download URL, or None if not found.
         """
         endpoint = f"{API_ROOT}/image/{image_key}!sizedetails"
         try:
