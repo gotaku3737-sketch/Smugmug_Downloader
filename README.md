@@ -33,10 +33,10 @@ Smugmug_Downloader/
 
 ## Setup
 
-### 1. Install dependencies
+### 1. Install the application
 
 ```bash
-pip3 install -r requirements.txt
+pip3 install .
 ```
 
 ### 2. Get SmugMug API credentials
@@ -56,7 +56,7 @@ Set your credentials via **one of** these methods:
 ### Download all galleries
 
 ```bash
-python3 main.py
+smugmug-download
 ```
 
 On first run, the app will:
@@ -68,31 +68,31 @@ On first run, the app will:
 ### Download to a specific directory
 
 ```bash
-python3 main.py -o ~/SmugMug_Backup
+smugmug-download -o ~/SmugMug_Backup
 ```
 
 ### Download a specific album
 
 ```bash
-python3 main.py -a "Vacation 2024"
+smugmug-download -a "Vacation 2024"
 ```
 
 ### List all albums (no download)
 
 ```bash
-python3 main.py --list-albums
+smugmug-download --list-albums
 ```
 
 ### Check download progress
 
 ```bash
-python3 main.py --status -o ~/SmugMug_Backup
+smugmug-download --status -o ~/SmugMug_Backup
 ```
 
 ### Reset tracking state and start fresh
 
 ```bash
-python3 main.py --reset -o ~/SmugMug_Backup
+smugmug-download --reset -o ~/SmugMug_Backup
 ```
 
 ### Resume an interrupted download
@@ -100,7 +100,7 @@ python3 main.py --reset -o ~/SmugMug_Backup
 Simply re-run the same command — already-downloaded files are automatically skipped:
 
 ```bash
-python3 main.py -o ~/SmugMug_Backup
+smugmug-download -o ~/SmugMug_Backup
 ```
 
 ## Running Tests
