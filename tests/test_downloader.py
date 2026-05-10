@@ -44,6 +44,13 @@ class TestGetImageFilename:
     def test_with_filename(self):
         assert get_image_filename({"FileName": "vacation.jpg"}) == "vacation.jpg"
 
+    def test_prevent_path_traversal(self):
+        assert get_image_filename({"FileName": "../../../etc/passwd"}) == "passwd"
+        assert get_image_filename({"FileName": "..\\..\\..\\etc\\passwd"}) == "passwd"
+        assert get_image_filename({"FileName": "C:\\Windows\\System32\\cmd.exe"}) == "cmd.exe"
+        assert get_image_filename({"FileName": "/absolute/path/to/image.jpg"}) == "image.jpg"
+        assert get_image_filename({"FileName": "folder/../image.jpg"}) == "image.jpg"
+
     def test_without_filename_with_key_and_format(self):
         assert get_image_filename({"ImageKey": "IMG1", "Format": "PNG"}) == "IMG1.png"
 
