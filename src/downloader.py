@@ -87,6 +87,10 @@ def get_image_filename(image):
         str: Filename for saving.
     """
     filename = image.get("FileName", "")
+    if filename:
+        # Sanitize filename to prevent path traversal
+        filename = os.path.basename(filename.replace("\\", "/"))
+
     if not filename:
         key = extract_image_key(image)
         # Try to determine extension from format
