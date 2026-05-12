@@ -75,3 +75,19 @@ class TestGetImageFilename:
 
     def test_missing_format_defaults_to_jpg(self):
         assert get_image_filename({"ImageKey": "IMG1"}) == "IMG1.jpg"
+
+    def test_path_traversal_unix(self):
+        assert get_image_filename({"FileName": "../../../etc/passwd", "ImageKey": "IMG1"}) == "passwd"
+
+    def test_path_traversal_absolute(self):
+        assert get_image_filename({"FileName": "/absolute/path/test.jpg", "ImageKey": "IMG1"}) == "test.jpg"
+
+    def test_path_traversal_windows(self):
+        assert get_image_filename({"FileName": "..\\..\\windows\\system32\\cmd.exe", "ImageKey": "IMG1"}) == "cmd.exe"
+
+    def test_path_traversal_empty_basename(self):
+        # When filename evaluates to empty basename, it should fallback to image key
+        assert get_image_filename({"FileName": "/", "ImageKey": "IMG1", "Format": "PNG"}) == "IMG1.png"
+        assert get_image_filename({"FileName": "\\", "ImageKey": "IMG1", "Format": "PNG"}) == "IMG1.png"
+        assert get_image_filename({"FileName": ".", "ImageKey": "IMG1", "Format": "PNG"}) == "IMG1.png"
+        assert get_image_filename({"FileName": "..", "ImageKey": "IMG1", "Format": "PNG"}) == "IMG1.png"
