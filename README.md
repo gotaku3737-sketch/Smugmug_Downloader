@@ -17,6 +17,7 @@ A Python CLI tool to download **all galleries (albums)** from a SmugMug account 
 Smugmug_Downloader/
 ├── main.py                          # Entry point
 ├── requirements.txt                 # Python dependencies
+├── setup.py                         # Package installation script
 ├── .env.example                     # API credential template
 ├── features/                        # Gherkin BDD specifications
 │   ├── api_resilience.feature
@@ -48,12 +49,20 @@ Smugmug_Downloader/
 ### 1. Install the application
 
 ```bash
-pip3 install .
+pip3 install -e .
+```
+
+This installs the project locally and makes the `smd` command available in your terminal.
+
+To uninstall the tool and remove the `smd` command later, simply run:
+```bash
+pip3 uninstall smugmug-downloader
 ```
 
 ### 2. Get SmugMug API credentials
 
-Apply for an API key at [https://api.smugmug.com/api/developer/apply](https://api.smugmug.com/api/developer/apply).
+```
+Apply for an API key at https://api.smugmug.com/api/developer/apply.
 
 Set your credentials via **one of** these methods:
 
@@ -62,13 +71,14 @@ Set your credentials via **one of** these methods:
 | **Environment variables** | `export SMUGMUG_API_KEY=... SMUGMUG_API_SECRET=...` |
 | **Static constants** | Edit `API_KEY` and `API_SECRET` at the top of `src/config.py` |
 | **Interactive prompt** | Just run the app — it will ask you |
+```
 
 ## Usage
 
 ### Download all galleries
 
 ```bash
-smugmug-download
+smd
 ```
 
 On first run, the app will:
@@ -80,31 +90,31 @@ On first run, the app will:
 ### Download to a specific directory
 
 ```bash
-smugmug-download -o ~/SmugMug_Backup
+smd -o ~/SmugMug_Backup
 ```
 
 ### Download a specific album
 
 ```bash
-smugmug-download -a "Vacation 2024"
+smd -a "Vacation 2024"
 ```
 
 ### List all albums (no download)
 
 ```bash
-smugmug-download --list-albums
+smd --list-albums
 ```
 
 ### Check download progress
 
 ```bash
-smugmug-download --status -o ~/SmugMug_Backup
+smd --status -o ~/SmugMug_Backup
 ```
 
 ### Reset tracking state and start fresh
 
 ```bash
-smugmug-download --reset -o ~/SmugMug_Backup
+smd --reset -o ~/SmugMug_Backup
 ```
 
 ### Resume an interrupted download
@@ -112,7 +122,7 @@ smugmug-download --reset -o ~/SmugMug_Backup
 Simply re-run the same command — already-downloaded files are automatically skipped:
 
 ```bash
-smugmug-download -o ~/SmugMug_Backup
+smd -o ~/SmugMug_Backup
 ```
 
 ## Running Tests
