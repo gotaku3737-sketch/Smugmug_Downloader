@@ -88,7 +88,7 @@ def get_image_filename(image):
     """
     filename = image.get("FileName", "")
     if filename:
-        # Sanitize filename to prevent path traversal
+        # Prevent path traversal vulnerabilities by sanitizing the filename
         filename = os.path.basename(filename.replace("\\", "/"))
 
     if not filename:
