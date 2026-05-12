@@ -87,6 +87,14 @@ def get_image_filename(image):
         str: Filename for saving.
     """
     filename = image.get("FileName", "")
+
+    # Sentinel: Fix Path Traversal vulnerability by sanitizing the filename
+    if filename:
+        filename = os.path.basename(filename.replace("\\", "/"))
+        # Prevent empty or simple '.'/'..' from bypassing sanitization
+        if filename in ("", ".", ".."):
+            filename = ""
+
     if not filename:
         key = extract_image_key(image)
         # Try to determine extension from format

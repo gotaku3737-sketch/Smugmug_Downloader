@@ -1,0 +1,4 @@
+## 2024-05-12 - Path Traversal Vulnerability in File Downloads
+**Vulnerability:** The `get_image_filename` function used the `FileName` property directly from the SmugMug API without sanitization. If the API returned a malformed filename like `../../../etc/passwd` or an absolute path `/absolute/path/file.jpg`, the downloaded file would be written outside the intended output directory, resulting in a critical path traversal vulnerability.
+**Learning:** External API inputs must never be trusted directly, especially when constructing filesystem paths using `os.path.join`. Even if the API is "trusted," data could be poisoned upstream or accidentally malformed.
+**Prevention:** Always sanitize filenames obtained from external sources using `os.path.basename` and ensure slashes (both `/` and `\`) are normalized to prevent bypassing checks. Handle edge cases where sanitization results in an empty string by falling back to safe, generated identifiers (e.g. image keys).
