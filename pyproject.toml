@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smugmug-downloader"
+version = "1.0.0"
+authors = [
+  { name="Jules" },
+]
+description = "A Python CLI tool to download all galleries from a SmugMug account using the SmugMug API v2."
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "requests>=2.31.0",
+    "requests-oauthlib>=1.3.1",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+smugmug-download = "src.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["src*"]
