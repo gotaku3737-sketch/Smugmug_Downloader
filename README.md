@@ -18,6 +18,11 @@ Smugmug_Downloader/
 ├── main.py                          # Entry point
 ├── requirements.txt                 # Python dependencies
 ├── .env.example                     # API credential template
+├── features/                        # Gherkin BDD specifications
+│   ├── api_resilience.feature
+│   ├── authentication.feature
+│   ├── cli_workflows.feature
+│   └── download_tracking.feature
 ├── src/
 │   ├── __init__.py
 │   ├── config.py                    # Settings & credential resolution
@@ -27,8 +32,15 @@ Smugmug_Downloader/
 │   ├── downloader.py                # Download orchestration engine
 │   └── cli.py                       # CLI interface (argparse + rich)
 └── tests/
+    ├── step_defs/                   # BDD step definitions
+    │   ├── test_api_steps.py
+    │   ├── test_authentication_steps.py
+    │   ├── test_cli_steps.py
+    │   └── test_tracking_steps.py
     ├── test_tracker.py              # Unit tests for state tracker
-    └── test_api_client.py           # Unit tests for API client (mocked)
+    ├── test_api_client.py           # Unit tests for API client
+    ├── test_downloader.py           # Unit tests for downloader logic
+    └── test_security_fix.py         # Unit tests for security fixes
 ```
 
 ## Setup
@@ -106,6 +118,12 @@ python3 main.py -o ~/SmugMug_Backup
 ## Running Tests
 
 ```bash
-pip3 install pytest
+pip3 install -r requirements.txt
 python3 -m pytest tests/ -v
+```
+
+To run only the BDD tests:
+
+```bash
+python3 -m pytest tests/step_defs/ -v
 ```
