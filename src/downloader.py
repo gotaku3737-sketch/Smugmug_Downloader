@@ -90,6 +90,8 @@ def get_image_filename(image):
     if filename:
         # Prevent path traversal vulnerabilities by sanitizing the filename
         filename = os.path.basename(filename.replace("\\", "/"))
+        if filename in (".", ".."):
+            filename = ""
 
     if not filename:
         key = extract_image_key(image)
