@@ -53,3 +53,21 @@ def test_authorize_uses_password_masking_for_verifier():
         # Check that verifier input was called with password=True
         mock_console.input.assert_called_once()
         assert mock_console.input.call_args.kwargs.get("password") is True
+
+def test_save_tokens_uses_secure_permissions():
+    tokens = {"oauth_token": "at", "oauth_token_secret": "ats"}
+
+    with patch("os.open") as mock_open:
+        mock_open.return_value = 42 # dummy fd
+        with patch("os.fdopen") as mock_fdopen:
+            mock_file = MagicMock()
+            mock_fdopen.return_value.__enter__.return_value = mock_file
+
+            src.auth.save_tokens(tokens)
+
+            mock_open.assert_called_once_with(
+                src.auth.TOKEN_FILE,
+                os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                0o600
+            )
+            mock_fdopen.assert_called_once_with(42, "w")
