@@ -50,13 +50,13 @@ def save_tokens(tokens):
         tokens (dict): Token dict with 'oauth_token' and 'oauth_token_secret'.
     """
     try:
-        with open(TOKEN_FILE, "w") as f:
+        fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
             json.dump(tokens, f, indent=2)
-        os.chmod(TOKEN_FILE, 0o600)  # Restrict permissions
         console.print(
             f"[dim]Tokens saved to {TOKEN_FILE}[/dim]"
         )
-    except IOError as e:
+    except OSError as e:
         console.print(f"[yellow]Warning: Could not save tokens: {e}[/yellow]")
 
 
