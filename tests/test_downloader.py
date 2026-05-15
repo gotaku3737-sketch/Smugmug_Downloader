@@ -91,3 +91,10 @@ class TestGetImageFilename:
         assert get_image_filename({"FileName": "\\", "ImageKey": "IMG1", "Format": "PNG"}) == "IMG1.png"
         assert get_image_filename({"FileName": ".", "ImageKey": "IMG1", "Format": "PNG"}) == "IMG1.png"
         assert get_image_filename({"FileName": "..", "ImageKey": "IMG1", "Format": "PNG"}) == "IMG1.png"
+
+    def test_path_traversal_in_imagekey(self):
+        assert get_image_filename({"ImageKey": "../../../etc/passwd", "Format": "JPG"}) == "passwd.jpg"
+        assert get_image_filename({"ImageKey": "..\\..\\windows\\system32\\cmd.exe", "Format": "JPG"}) == "cmd.exe.jpg"
+        assert get_image_filename({"ImageKey": "/", "Format": "JPG"}) == "untitled_image.jpg"
+        assert get_image_filename({"ImageKey": ".", "Format": "JPG"}) == "untitled_image.jpg"
+        assert get_image_filename({"ImageKey": "..", "Format": "JPG"}) == "untitled_image.jpg"
