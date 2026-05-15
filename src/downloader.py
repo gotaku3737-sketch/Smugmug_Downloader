@@ -95,6 +95,12 @@ def get_image_filename(image):
 
     if not filename:
         key = extract_image_key(image)
+
+        # Prevent path traversal vulnerabilities by sanitizing the fallback key
+        key = os.path.basename(key.replace("\\", "/"))
+        if key in (".", "..", ""):
+            key = "untitled_image"
+
         # Try to determine extension from format
         fmt = image.get("Format", "JPG").upper()
         ext_map = {"JPG": "jpg", "JPEG": "jpg", "PNG": "png",
