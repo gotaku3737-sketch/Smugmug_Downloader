@@ -71,3 +71,34 @@ def test_save_tokens_uses_secure_permissions():
                 0o600
             )
             mock_fdopen.assert_called_once_with(42, "w")
+
+def test_download_file_prevents_ssrf():
+    import sys
+    from unittest.mock import MagicMock
+    from src.api_client import SmugMugClient
+    from requests_oauthlib import OAuth1Session
+
+    # Create a dummy session and client
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # Test non-HTTPS URL
+    assert client.download_file("http://api.smugmug.com/image.jpg", "/tmp/out") is False
+    assert mock_session.get.call_count == 0
+
+    # Test non-SmugMug hostname
+    assert client.download_file("https://attacker.com/image.jpg", "/tmp/out") is False
+    assert mock_session.get.call_count == 0
+
+    # Test valid SmugMug hostname but no subdomain
+    assert client.download_file("https://smugmug.com.attacker.com/image.jpg", "/tmp/out") is False
+    assert mock_session.get.call_count == 0
+
+    # Test valid subdomains (should attempt request, but since we mock, we catch the exception or setup mock return)
+    mock_session.get.side_effect = Exception("Should try to download")
+    try:
+        client.download_file("https://api.smugmug.com/image.jpg", "/tmp/out")
+    except Exception:
+        pass
+    # Depending on retry logic, it might catch it or not. The point is it didn't return False early.
+    assert mock_session.get.call_count > 0

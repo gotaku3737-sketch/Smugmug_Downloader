@@ -6,7 +6,11 @@ Wraps REST calls with pagination, retry logic, and error handling.
 
 import time
 
+
+from urllib.parse import urlparse
+
 from rich.console import Console
+
 
 from src.config import BASE_URL, API_ROOT, PAGE_SIZE, MAX_RETRIES, RETRY_BACKOFF
 
@@ -236,8 +240,24 @@ class SmugMugClient:
         Returns:
             bool: True if download succeeded.
         """
+
         from src.config import CHUNK_SIZE
         import os
+
+        # Security fix: Prevent SSRF and OAuth token leaks by validating the download URL
+        try:
+            parsed_url = urlparse(url)
+            hostname = parsed_url.hostname or ""
+            if parsed_url.scheme != "https":
+                console.print(f"[red]Security Error: Refusing to download from non-HTTPS URL: {url}[/red]")
+                return False
+            if not (hostname == "smugmug.com" or hostname.endswith(".smugmug.com")):
+                console.print(f"[red]Security Error: Refusing to download from untrusted hostname: {hostname}[/red]")
+                return False
+        except Exception as e:
+            console.print(f"[red]Security Error: Invalid URL format: {url}[/red]")
+            return False
+
 
         for attempt in range(MAX_RETRIES):
             try:
