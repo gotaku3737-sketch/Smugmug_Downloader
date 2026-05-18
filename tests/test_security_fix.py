@@ -102,3 +102,49 @@ def test_download_file_prevents_ssrf():
         pass
     # Depending on retry logic, it might catch it or not. The point is it didn't return False early.
     assert mock_session.get.call_count > 0
+
+def test_download_file_prevents_redirect_ssrf():
+    from src.api_client import SmugMugClient
+    from unittest.mock import MagicMock
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # Mock responses to simulate a redirect to an attacker domain
+    class MockRedirectResponse:
+        def __init__(self, is_redirect, location=None, status=200):
+            self.is_redirect = is_redirect
+            self.headers = {"Location": location} if location else {}
+            self.status_code = status
+        def raise_for_status(self):
+            pass
+
+    # First request returns a 302 redirect to attacker.com
+    # The while loop will check the new URL and reject it
+    mock_session.get.return_value = MockRedirectResponse(True, "https://attacker.com/image.jpg", 302)
+
+    result = client.download_file("https://api.smugmug.com/image.jpg", "/tmp/out")
+
+    # Should be rejected because it redirected to attacker.com
+    assert result is False
+
+    # Ensure it only made the FIRST request and didn't follow the redirect!
+    assert mock_session.get.call_count == 1
+    mock_session.get.assert_called_with("https://api.smugmug.com/image.jpg", stream=True, timeout=60, allow_redirects=False)
+
+def test_request_prevents_ssrf_in_endpoint():
+    from src.api_client import SmugMugClient, SmugMugAPIError
+    from unittest.mock import MagicMock
+    import pytest
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # An attacker controls endpoint (e.g. via NextPage)
+    malicious_endpoint = "@attacker.com/api/v2"
+
+    with pytest.raises(SmugMugAPIError) as exc_info:
+        client._request("GET", malicious_endpoint)
+
+    assert "Invalid endpoint" in str(exc_info.value)
+    assert mock_session.request.call_count == 0

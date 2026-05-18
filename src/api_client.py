@@ -51,6 +51,9 @@ class SmugMugClient:
         Raises:
             SmugMugAPIError: If the API returns an error after retries.
         """
+        # Security fix: Prevent SSRF via manipulated endpoint paths (e.g. NextPage)
+        if not endpoint.startswith("/"):
+            raise SmugMugAPIError(0, f"Security Error: Invalid endpoint '{endpoint}'. Must start with '/'")
         url = f"{self.base_url}{endpoint}"
 
         if params is None:
@@ -261,7 +264,33 @@ class SmugMugClient:
 
         for attempt in range(MAX_RETRIES):
             try:
-                response = self.session.get(url, stream=True, timeout=60)
+                current_url = url
+                response = self.session.get(current_url, stream=True, timeout=60, allow_redirects=False)
+
+                # Security fix: Handle redirects manually to prevent OAuth token leaks to untrusted domains
+                redirects_followed = 0
+                max_redirects = 30
+                while response.is_redirect:
+                    if redirects_followed >= max_redirects:
+                        console.print(f"[red]Security Error: Too many redirects (>{max_redirects})[/red]")
+                        return False
+                    redirects_followed += 1
+
+                    from urllib.parse import urljoin
+                    redirect_target = response.headers.get("Location")
+                    if not redirect_target:
+                        break
+
+                    current_url = urljoin(current_url, redirect_target)
+                    parsed_redir = urlparse(current_url)
+                    redir_host = parsed_redir.hostname or ""
+
+                    if parsed_redir.scheme != "https" or not (redir_host == "smugmug.com" or redir_host.endswith(".smugmug.com")):
+                        console.print(f"[red]Security Error: Refusing redirect to untrusted URL: {current_url}[/red]")
+                        return False
+
+                    response = self.session.get(current_url, stream=True, timeout=60, allow_redirects=False)
+
                 response.raise_for_status()
 
                 # Get total size from headers
