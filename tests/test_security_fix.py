@@ -148,3 +148,31 @@ def test_request_prevents_ssrf_in_endpoint():
 
     assert "Invalid endpoint" in str(exc_info.value)
     assert mock_session.request.call_count == 0
+
+def test_request_prevents_redirect_ssrf():
+    from src.api_client import SmugMugClient, SmugMugAPIError
+    from unittest.mock import MagicMock
+    import pytest
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    class MockRedirectResponse:
+        def __init__(self, is_redirect, location=None, status=302):
+            self.is_redirect = is_redirect
+            self.headers = {"Location": location} if location else {}
+            self.status_code = status
+        def json(self): return {}
+
+    # Simulate a redirect to an attacker's domain
+    mock_session.request.return_value = MockRedirectResponse(True, "https://attacker.com/api", 302)
+
+    with pytest.raises(SmugMugAPIError) as exc_info:
+        client._request("GET", "/test")
+
+    assert "untrusted URL" in str(exc_info.value) or "Security Error" in str(exc_info.value)
+
+    # Check that allow_redirects=False was used
+    assert mock_session.request.call_count == 1
+    kwargs = mock_session.request.call_args[1]
+    assert kwargs.get("allow_redirects") is False

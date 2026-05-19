@@ -7,7 +7,7 @@ Wraps REST calls with pagination, retry logic, and error handling.
 import time
 
 
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 from rich.console import Console
 
@@ -64,9 +64,44 @@ class SmugMugClient:
         last_error = None
         for attempt in range(MAX_RETRIES):
             try:
+                current_url = url
+                current_method = method
+                # Copy kwargs to avoid mutating the outer retry loop's state
+                current_kwargs = dict(kwargs)
                 response = self.session.request(
-                    method, url, params=params, headers=headers, timeout=30, **kwargs
+                    current_method, current_url, params=params, headers=headers, timeout=30, allow_redirects=False, **current_kwargs
                 )
+
+                # Security fix: Handle redirects manually to prevent OAuth token leaks to untrusted domains
+                redirects_followed = 0
+                max_redirects = 30
+                while getattr(response, "is_redirect", False) is True:
+                    if redirects_followed >= max_redirects:
+                        raise SmugMugAPIError(0, f"Security Error: Too many redirects (>{max_redirects})")
+                    redirects_followed += 1
+
+                    redirect_target = response.headers.get("Location")
+                    if not redirect_target:
+                        break
+
+                    current_url = urljoin(current_url, redirect_target)
+                    parsed_redir = urlparse(current_url)
+                    redir_host = parsed_redir.hostname or ""
+
+                    if parsed_redir.scheme != "https" or not (redir_host == "smugmug.com" or redir_host.endswith(".smugmug.com")):
+                        raise SmugMugAPIError(0, f"Security Error: Refusing redirect to untrusted URL: {current_url}")
+
+                    # Determine correct HTTP method for redirect per HTTP spec
+                    if response.status_code in (301, 302, 303):
+                        current_method = "GET"
+                        # Drop payloads for GET redirects
+                        current_kwargs.pop("data", None)
+                        current_kwargs.pop("json", None)
+                        current_kwargs.pop("files", None)
+
+                    response = self.session.request(
+                        current_method, current_url, headers=headers, timeout=30, allow_redirects=False, **current_kwargs
+                    )
 
                 if response.status_code == 200:
                     return response.json()
