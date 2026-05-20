@@ -4,6 +4,7 @@ SmugMug API v2 client.
 Wraps REST calls with pagination, retry logic, and error handling.
 """
 
+import hashlib
 import time
 
 
@@ -15,6 +16,29 @@ from rich.console import Console
 from src.config import BASE_URL, API_ROOT, PAGE_SIZE, MAX_RETRIES, RETRY_BACKOFF
 
 console = Console()
+
+
+def verify_md5(file_path, expected_md5):
+    """Verify MD5 checksum of a file against expected value.
+
+    Args:
+        file_path (str): Path to the file.
+        expected_md5 (str): Expected MD5 hex string.
+
+    Returns:
+        bool: True if checksums match or expected_md5 is not provided.
+    """
+    if not expected_md5:
+        return True
+    try:
+        hash_md5 = hashlib.md5()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                hash_md5.update(chunk)
+        return hash_md5.hexdigest().lower() == expected_md5.lower()
+    except IOError:
+        return False
+
 
 
 class SmugMugAPIError(Exception):
@@ -267,13 +291,15 @@ class SmugMugClient:
         data = self._request("GET", endpoint)
         return data.get("Response", {}).get("Image", {})
 
-    def download_file(self, url, dest_path, expected_size=None):
+    def download_file(self, url, dest_path, expected_size=None, expected_md5=None, progress_callback=None):
         """Download a file with streaming and retry support.
 
         Args:
             url (str): URL to download.
             dest_path (str): Local file path to write to.
             expected_size (int, optional): Expected file size for verification.
+            expected_md5 (str, optional): Expected MD5 hash for verification.
+            progress_callback (callable, optional): Callback that takes bytes count downloaded.
 
         Returns:
             bool: True if download succeeded.
@@ -298,6 +324,9 @@ class SmugMugClient:
 
 
         for attempt in range(MAX_RETRIES):
+            if progress_callback and hasattr(progress_callback, "reset_attempt"):
+                progress_callback.reset_attempt()
+
             try:
                 current_url = url
                 response = self.session.get(current_url, stream=True, timeout=60, allow_redirects=False)
@@ -330,6 +359,8 @@ class SmugMugClient:
 
                 # Get total size from headers
                 total_size = int(response.headers.get("Content-Length", 0))
+                if total_size and progress_callback and hasattr(progress_callback, "set_actual_size"):
+                    progress_callback.set_actual_size(total_size)
 
                 # Write to temp file first
                 temp_path = dest_path + ".tmp"
@@ -340,12 +371,22 @@ class SmugMugClient:
                         if chunk:
                             f.write(chunk)
                             downloaded += len(chunk)
+                            if progress_callback:
+                                progress_callback(len(chunk))
 
                 # Verify size if known
                 if total_size and downloaded != total_size:
                     console.print(
                         f"[yellow]Size mismatch: expected {total_size}, "
                         f"got {downloaded}. Retrying...[/yellow]"
+                    )
+                    os.remove(temp_path)
+                    continue
+
+                # Verify MD5 if known
+                if expected_md5 and not verify_md5(temp_path, expected_md5):
+                    console.print(
+                        f"[yellow]MD5 mismatch: expected {expected_md5}. Retrying...[/yellow]"
                     )
                     os.remove(temp_path)
                     continue

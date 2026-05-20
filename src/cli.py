@@ -9,7 +9,7 @@ import sys
 from rich.console import Console
 
 from src import __version__
-from src.config import DEFAULT_OUTPUT_DIR, get_api_credentials
+from src.config import DEFAULT_OUTPUT_DIR, get_api_credentials, DEFAULT_WORKERS
 from src.auth import get_oauth_session
 from src.api_client import SmugMugClient
 from src.downloader import list_albums, show_status, run_download
@@ -83,6 +83,12 @@ def main():
         action="store_true",
         help="Clear all download tracking state and start fresh",
     )
+    parser.add_argument(
+        "-w", "--workers",
+        type=int,
+        default=DEFAULT_WORKERS,
+        help=f"Number of concurrent download workers (default: {DEFAULT_WORKERS})",
+    )
 
     args = parser.parse_args()
 
@@ -138,7 +144,7 @@ def main():
 
     # Run the download
     try:
-        run_download(client, output_dir, album_filter=args.album)
+        run_download(client, output_dir, album_filter=args.album, workers=args.workers)
     except KeyboardInterrupt:
         console.print(
             "\n[yellow]Download interrupted. Progress has been saved.[/yellow]"

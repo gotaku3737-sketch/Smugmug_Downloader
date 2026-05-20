@@ -164,3 +164,36 @@ class TestGetImageDownloadUrl:
         mock_session.request.return_value = make_response(404, text="Not Found")
         url = client.get_image_download_url("IMG1")
         assert url is None
+
+
+class TestDownloadFile:
+    @patch("src.api_client.verify_md5")
+    @patch("src.api_client.time.sleep")
+    def test_download_file_success(self, mock_sleep, mock_verify_md5, client, mock_session, tmp_path):
+        import os
+        dest_path = str(tmp_path / "test.jpg")
+        mock_response = MagicMock()
+        mock_response.headers = {"Content-Length": "5"}
+        mock_response.iter_content.return_value = [b"hello"]
+        mock_session.get.return_value = mock_response
+        mock_verify_md5.return_value = True
+
+        success = client.download_file("https://photos.smugmug.com/img.jpg", dest_path, expected_size=5, expected_md5="abc")
+        assert success
+        assert os.path.exists(dest_path)
+        with open(dest_path, "r") as f:
+            assert f.read() == "hello"
+
+    @patch("src.api_client.verify_md5")
+    @patch("src.api_client.time.sleep")
+    def test_download_file_md5_mismatch_retry(self, mock_sleep, mock_verify_md5, client, mock_session, tmp_path):
+        dest_path = str(tmp_path / "test.jpg")
+        mock_response = MagicMock()
+        mock_response.headers = {"Content-Length": "5"}
+        mock_response.iter_content.return_value = [b"hello"]
+        mock_session.get.return_value = mock_response
+        mock_verify_md5.side_effect = [False, True]
+
+        success = client.download_file("https://photos.smugmug.com/img.jpg", dest_path, expected_size=5, expected_md5="abc")
+        assert success
+        assert mock_session.get.call_count == 2

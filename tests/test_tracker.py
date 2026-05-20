@@ -154,3 +154,32 @@ class TestReporting:
         tracker.register_album("KEY1", "Album1", "album1", 3)
         tracker.reset()
         assert tracker.state["albums"] == {}
+
+
+class TestThreadSafety:
+    def test_concurrent_modifications(self, tracker):
+        import threading
+
+        num_threads = 10
+        num_ops = 20
+        threads = []
+
+        # Concurrently modify tracker state
+        def worker(thread_idx):
+            for op in range(num_ops):
+                album_key = f"ALBUM_{thread_idx}_{op}"
+                tracker.register_album(album_key, f"Album {thread_idx}", f"path_{thread_idx}", 5)
+                tracker.register_image(album_key, "IMG_1", "img.jpg")
+                tracker.set_image_status(album_key, "IMG_1", "done")
+
+        for i in range(num_threads):
+            t = threading.Thread(target=worker, args=(i,))
+            threads.append(t)
+            t.start()
+
+        for t in threads:
+            t.join()
+
+        summary = tracker.get_summary()
+        assert summary["total_albums"] == num_threads * num_ops
+        assert summary["done_images"] == num_threads * num_ops

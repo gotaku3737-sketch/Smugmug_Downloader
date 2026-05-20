@@ -9,17 +9,19 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from rich.console import Console
 from rich.progress import (
     BarColumn,
+    DownloadColumn,
     MofNCompleteColumn,
     Progress,
     SpinnerColumn,
     TextColumn,
     TimeRemainingColumn,
+    TransferSpeedColumn,
 )
 from rich.table import Table
 
-from src.api_client import SmugMugClient
+from src.api_client import SmugMugClient, verify_md5
 from src.tracker import DownloadTracker
-from src.config import STATE_FILENAME
+from src.config import STATE_FILENAME, DEFAULT_WORKERS
 
 console = Console()
 
@@ -202,8 +204,129 @@ def show_status(output_dir):
     console.print(table)
 
 
-def download_album_images(client, tracker, album, output_dir, album_key):
-    """Download all images for a single album.
+class ProgressCallback:
+    """Callback to update Rich progress bars during download."""
+
+    def __init__(self, progress, sub_task_id, album_task_id, global_task_id, estimated_size):
+        self.progress = progress
+        self.sub_task_id = sub_task_id
+        self.album_task_id = album_task_id
+        self.global_task_id = global_task_id
+        self.estimated_size = estimated_size
+        self.downloaded_in_attempt = 0
+
+    def _get_task_total(self, task_id):
+        task = next((t for t in self.progress.tasks if t.id == task_id), None)
+        return task.total if task else 0
+
+    def set_actual_size(self, actual_size):
+        if self.sub_task_id is not None:
+            self.progress.update(self.sub_task_id, total=actual_size)
+        diff = actual_size - self.estimated_size
+        if diff != 0:
+            album_total = self._get_task_total(self.album_task_id)
+            global_total = self._get_task_total(self.global_task_id)
+            self.progress.update(self.album_task_id, total=album_total + diff)
+            self.progress.update(self.global_task_id, total=global_total + diff)
+            self.estimated_size = actual_size
+
+    def __call__(self, chunk_len):
+        self.downloaded_in_attempt += chunk_len
+        if self.sub_task_id is not None:
+            self.progress.update(self.sub_task_id, completed=self.downloaded_in_attempt)
+        self.progress.advance(self.album_task_id, chunk_len)
+        self.progress.advance(self.global_task_id, chunk_len)
+
+    def reset_attempt(self):
+        if self.downloaded_in_attempt > 0:
+            self.progress.advance(self.album_task_id, -self.downloaded_in_attempt)
+            self.progress.advance(self.global_task_id, -self.downloaded_in_attempt)
+        self.downloaded_in_attempt = 0
+        if self.sub_task_id is not None:
+            self.progress.update(self.sub_task_id, completed=0)
+
+
+def download_image_worker(client, tracker, image, album_key, album_dir, progress, album_task_id, global_task_id):
+    """Worker task to download a single image."""
+    image_key = extract_image_key(image)
+    filename = get_image_filename(image)
+    dest_path = os.path.join(album_dir, filename)
+
+    fmt = image.get("Format", "JPG").upper()
+    is_video = fmt in ["MP4", "MOV"]
+    fallback_size = 50 * 1024 * 1024 if is_video else 5 * 1024 * 1024
+    est_size = image.get("ArchivedSize") or fallback_size
+    expected_md5 = image.get("ArchivedMD5")
+
+    # 1. Skip if already completed in tracker
+    if tracker.is_image_done(album_key, image_key):
+        progress.advance(album_task_id, est_size)
+        progress.advance(global_task_id, est_size)
+        return "skipped"
+
+    tracker.register_image(album_key, image_key, filename)
+    tracker.set_image_status(album_key, image_key, "in_progress")
+
+    # 2. Check if file already exists on disk
+    if os.path.exists(dest_path):
+        if expected_md5:
+            if verify_md5(dest_path, expected_md5):
+                tracker.set_image_status(album_key, image_key, "done")
+                progress.advance(album_task_id, est_size)
+                progress.advance(global_task_id, est_size)
+                return "skipped"
+        else:
+            expected_size = image.get("ArchivedSize")
+            if expected_size and os.path.getsize(dest_path) == expected_size:
+                tracker.set_image_status(album_key, image_key, "done")
+                progress.advance(album_task_id, est_size)
+                progress.advance(global_task_id, est_size)
+                return "skipped"
+            elif not expected_size:
+                # Fallback: assume done if no expected size or MD5 and file exists
+                tracker.set_image_status(album_key, image_key, "done")
+                progress.advance(album_task_id, est_size)
+                progress.advance(global_task_id, est_size)
+                return "skipped"
+
+    # 3. Get download URL
+    download_url = image.get("ArchivedUri")
+    if not download_url:
+        download_url = client.get_image_download_url(image_key)
+
+    if not download_url:
+        progress.console.print(f"  [red]✗ No download URL for {filename}[/red]")
+        tracker.set_image_status(album_key, image_key, "failed")
+        progress.update(album_task_id, total=next((t.total for t in progress.tasks if t.id == album_task_id), 0) - est_size)
+        progress.update(global_task_id, total=next((t.total for t in progress.tasks if t.id == global_task_id), 0) - est_size)
+        return "failed"
+
+    # 4. Set up dynamic sub-task
+    sub_task_id = progress.add_task(f"  ↳ {filename}", total=est_size, visible=True)
+    cb = ProgressCallback(progress, sub_task_id, album_task_id, global_task_id, est_size)
+
+    # 5. Download the file
+    try:
+        success = client.download_file(
+            url=download_url,
+            dest_path=dest_path,
+            expected_size=image.get("ArchivedSize"),
+            expected_md5=expected_md5,
+            progress_callback=cb
+        )
+        if success:
+            tracker.set_image_status(album_key, image_key, "done")
+            return "downloaded"
+        else:
+            tracker.set_image_status(album_key, image_key, "failed")
+            cb.reset_attempt()
+            return "failed"
+    finally:
+        progress.remove_task(sub_task_id)
+
+
+def download_album_images(client, tracker, album, output_dir, album_key, progress, global_task_id, workers=DEFAULT_WORKERS):
+    """Download all images for a single album in parallel.
 
     Args:
         client (SmugMugClient): Authenticated API client.
@@ -211,6 +334,9 @@ def download_album_images(client, tracker, album, output_dir, album_key):
         album (dict): Album object.
         output_dir (str): Base output directory.
         album_key (str): Album key.
+        progress (Progress): Rich Progress instance.
+        global_task_id (TaskID): Rich task ID for global progress.
+        workers (int): Number of thread workers.
 
     Returns:
         tuple: (downloaded_count, skipped_count, failed_count)
@@ -228,71 +354,54 @@ def download_album_images(client, tracker, album, output_dir, album_key):
     )
     tracker.set_album_status(album_key, "in_progress")
 
+    # Compute initial total size estimate for this album
+    album_est_bytes = 0
+    for image in images:
+        fmt = image.get("Format", "JPG").upper()
+        is_video = fmt in ["MP4", "MOV"]
+        fallback_size = 50 * 1024 * 1024 if is_video else 5 * 1024 * 1024
+        size = image.get("ArchivedSize") or fallback_size
+        album_est_bytes += size
+
+    # Update global task total and add album task
+    global_total = next((t.total for t in progress.tasks if t.id == global_task_id), 0)
+    progress.update(global_task_id, total=global_total + album_est_bytes)
+    album_task_id = progress.add_task(f"📷 {album_name}", total=album_est_bytes)
+
     downloaded = 0
     skipped = 0
     failed = 0
 
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[bold]{task.description}"),
-        BarColumn(),
-        MofNCompleteColumn(),
-        TimeRemainingColumn(),
-        console=console,
-    ) as progress:
-        task = progress.add_task(
-            f"📷 {album_name}", total=len(images)
-        )
+    # Execute downloads in parallel
+    futures = {}
+    try:
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(
+                    download_image_worker,
+                    client, tracker, image, album_key, album_dir, progress, album_task_id, global_task_id
+                ): image
+                for image in images
+            }
 
-        for image in images:
-            image_key = extract_image_key(image)
-            filename = get_image_filename(image)
-
-            # Skip if already downloaded
-            if tracker.is_image_done(album_key, image_key):
-                skipped += 1
-                progress.advance(task)
-                continue
-
-            tracker.register_image(album_key, image_key, filename)
-            tracker.set_image_status(album_key, image_key, "in_progress")
-
-            # Get download URL
-            download_url = image.get("ArchivedUri")
-            if not download_url:
-                # Try to get from size details
-                download_url = client.get_image_download_url(image_key)
-
-            if not download_url:
-                console.print(
-                    f"  [red]✗ No download URL for {filename}[/red]"
-                )
-                tracker.set_image_status(album_key, image_key, "failed")
-                failed += 1
-                progress.advance(task)
-                continue
-
-            # Download the file
-            dest_path = os.path.join(album_dir, filename)
-
-            # Check if file already exists on disk (but state wasn't tracked)
-            if os.path.exists(dest_path):
-                tracker.set_image_status(album_key, image_key, "done")
-                skipped += 1
-                progress.advance(task)
-                continue
-
-            expected_size = image.get("ArchivedSize")
-            success = client.download_file(download_url, dest_path, expected_size)
-
-            if success:
-                tracker.set_image_status(album_key, image_key, "done")
-                downloaded += 1
-            else:
-                tracker.set_image_status(album_key, image_key, "failed")
-                failed += 1
-
-            progress.advance(task)
+            for future in as_completed(futures):
+                try:
+                    res = future.result()
+                    if res == "downloaded":
+                        downloaded += 1
+                    elif res == "skipped":
+                        skipped += 1
+                    elif res == "failed":
+                        failed += 1
+                except Exception as e:
+                    failed += 1
+                    progress.console.print(f"[red]Error downloading image: {e}[/red]")
+    except KeyboardInterrupt:
+        for future in futures:
+            future.cancel()
+        raise
+    finally:
+        progress.remove_task(album_task_id)
 
     # Mark album as done if all images succeeded
     if failed == 0:
@@ -303,13 +412,14 @@ def download_album_images(client, tracker, album, output_dir, album_key):
     return downloaded, skipped, failed
 
 
-def run_download(client, output_dir, album_filter=None):
-    """Run the full download process: discover albums then download all images.
+def run_download(client, output_dir, album_filter=None, workers=DEFAULT_WORKERS):
+    """Run the full download process: discover albums then download all images in parallel.
 
     Args:
         client (SmugMugClient): Authenticated API client.
         output_dir (str): Base output directory.
         album_filter (str, optional): If provided, only download this album name.
+        workers (int): Number of concurrent download workers.
     """
     os.makedirs(output_dir, exist_ok=True)
 
@@ -351,36 +461,56 @@ def run_download(client, output_dir, album_filter=None):
     total_skipped = 0
     total_failed = 0
 
-    for idx, album in enumerate(albums, 1):
-        album_key = extract_album_key(album)
-        album_name = album.get("Name", "Untitled")
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[bold]{task.description}"),
+        BarColumn(),
+        DownloadColumn(),
+        TransferSpeedColumn(),
+        TimeRemainingColumn(),
+        console=console,
+    ) as progress:
+        global_task_id = progress.add_task("Total Backup Progress", total=0)
 
-        # Skip fully downloaded albums
-        if tracker.is_album_done(album_key):
-            console.print(
-                f"[dim]  [{idx}/{len(albums)}] {album_name} — "
-                f"already complete, skipping[/dim]"
+        for idx, album in enumerate(albums, 1):
+            album_key = extract_album_key(album)
+            album_name = album.get("Name", "Untitled")
+
+            # Skip fully downloaded albums
+            if tracker.is_album_done(album_key):
+                progress.console.print(
+                    f"[dim]  [{idx}/{len(albums)}] {album_name} — "
+                    f"already complete, skipping[/dim]"
+                )
+                continue
+
+            progress.console.print(
+                f"\n[bold cyan]  [{idx}/{len(albums)}] Downloading: "
+                f"{album_name}[/bold cyan]"
             )
-            continue
 
-        console.print(
-            f"\n[bold cyan]  [{idx}/{len(albums)}] Downloading: "
-            f"{album_name}[/bold cyan]"
-        )
+            try:
+                downloaded, skipped, failed = download_album_images(
+                    client, tracker, album, output_dir, album_key, progress, global_task_id, workers=workers
+                )
+            except KeyboardInterrupt:
+                progress.console.print(
+                    "\n[yellow]Download interrupted. Progress has been saved.[/yellow]"
+                )
+                progress.console.print(
+                    "[dim]Run the same command again to resume.[/dim]"
+                )
+                raise
 
-        downloaded, skipped, failed = download_album_images(
-            client, tracker, album, output_dir, album_key
-        )
+            total_downloaded += downloaded
+            total_skipped += skipped
+            total_failed += failed
 
-        total_downloaded += downloaded
-        total_skipped += skipped
-        total_failed += failed
-
-        console.print(
-            f"  [green]↓ {downloaded}[/green] downloaded, "
-            f"[dim]{skipped} skipped[/dim]"
-            + (f", [red]{failed} failed[/red]" if failed else "")
-        )
+            progress.console.print(
+                f"  [green]↓ {downloaded}[/green] downloaded, "
+                f"[dim]{skipped} skipped[/dim]"
+                + (f", [red]{failed} failed[/red]" if failed else "")
+            )
 
     # Final summary
     console.print("\n" + "─" * 50)
