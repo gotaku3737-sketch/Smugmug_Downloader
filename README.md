@@ -4,12 +4,14 @@ A Python CLI tool to download **all galleries (albums)** from a SmugMug account 
 
 ## Features
 
-- **OAuth 1.0a authentication** — one-time browser-based authorization, tokens cached for future runs
-- **Full account download** — discovers and downloads every album tied to the account
-- **Resume support** — tracks per-image download state in a JSON file; interrupted downloads resume where they left off
-- **Retry with backoff** — automatically retries on rate limits, server errors, and connection failures
-- **Rich CLI output** — progress bars, colored status tables, and spinners
-- **Original quality** — downloads the archived (full-resolution) version of each photo/video
+- **Parallel downloads** — utilizes concurrent thread workers for high-speed file transfers.
+- **Integrity verification** — automatically validates downloaded files using MD5 checksums (with self-healing retries on mismatches).
+- **Advanced global progress** — displays real-time backup metrics, including overall transfer speed (MB/s), total backup size, aggregate ETA, and transient sub-task download bars.
+- **OAuth 1.0a authentication** — one-time browser-based authorization, tokens cached for future runs.
+- **Full account download** — discovers and downloads every album tied to the account.
+- **Resume support** — tracks per-image download state in a JSON file; interrupted downloads resume where they left off.
+- **Retry with backoff** — automatically retries on rate limits, server errors, and connection failures.
+- **Original quality** — downloads the archived (full-resolution) version of each photo/video.
 
 ## Project Structure
 
@@ -23,7 +25,9 @@ Smugmug_Downloader/
 │   ├── api_resilience.feature
 │   ├── authentication.feature
 │   ├── cli_workflows.feature
-│   └── download_tracking.feature
+│   ├── concurrency.feature
+│   ├── download_tracking.feature
+│   └── integrity.feature
 ├── src/
 │   ├── __init__.py
 │   ├── config.py                    # Settings & credential resolution
@@ -37,6 +41,8 @@ Smugmug_Downloader/
     │   ├── test_api_steps.py
     │   ├── test_authentication_steps.py
     │   ├── test_cli_steps.py
+    │   ├── test_concurrency_steps.py
+    │   ├── test_integrity_steps.py
     │   └── test_tracking_steps.py
     ├── test_tracker.py              # Unit tests for state tracker
     ├── test_api_client.py           # Unit tests for API client
@@ -61,8 +67,7 @@ pip3 uninstall smugmug-downloader
 
 ### 2. Get SmugMug API credentials
 
-```
-Apply for an API key at https://api.smugmug.com/api/developer/apply.
+Apply for an API key at [https://api.smugmug.com/api/developer/apply](https://api.smugmug.com/api/developer/apply).
 
 Set your credentials via **one of** these methods:
 
@@ -71,7 +76,6 @@ Set your credentials via **one of** these methods:
 | **Environment variables** | `export SMUGMUG_API_KEY=... SMUGMUG_API_SECRET=...` |
 | **Static constants** | Edit `API_KEY` and `API_SECRET` at the top of `src/config.py` |
 | **Interactive prompt** | Just run the app — it will ask you |
-```
 
 ## Usage
 
@@ -86,6 +90,13 @@ On first run, the app will:
 2. Ask where to save downloads (default: `./smugmug_downloads`)
 3. Walk you through OAuth authorization in your browser
 4. Begin downloading all albums
+
+### Specifying concurrent workers
+
+To speed up downloads, specify the maximum number of concurrent workers (default: 3):
+```bash
+smd -w 5
+```
 
 ### Download to a specific directory
 
