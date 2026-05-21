@@ -177,26 +177,22 @@ def test_request_prevents_redirect_ssrf():
     kwargs = mock_session.request.call_args[1]
     assert kwargs.get("allow_redirects") is False
 
-def test_download_file_prevents_ssrf_bypass_discrepancy():
+def test_urlparse_requests_discrepancy_bypass():
     from src.api_client import SmugMugClient
     from unittest.mock import MagicMock
+    import pytest
 
     mock_session = MagicMock()
     client = SmugMugClient(mock_session)
 
-    # An attacker tries to use urlparse discrepancy
-    # urlparse thinks hostname is smugmug.com
-    # requests thinks hostname is attacker.com
-    malicious_url = "https://attacker.com\\@smugmug.com/image.jpg"
-
-    result = client.download_file(malicious_url, "/tmp/out")
+    # Attack URL that bypasses simple urlparse but would be sent to attacker.com by requests
+    attack_url = "https://attacker.com\\@smugmug.com/image.jpg"
 
     # Should be rejected
-    assert result is False
+    assert client.download_file(attack_url, "/tmp/out") is False
     assert mock_session.get.call_count == 0
 
-
-def test_request_prevents_redirect_ssrf_bypass_discrepancy():
+def test_urlparse_requests_discrepancy_redirect_bypass():
     from src.api_client import SmugMugClient, SmugMugAPIError
     from unittest.mock import MagicMock
     import pytest
@@ -211,9 +207,8 @@ def test_request_prevents_redirect_ssrf_bypass_discrepancy():
             self.status_code = status
         def json(self): return {}
 
-    # Redirect to malicious URL leveraging discrepancy
-    malicious_redirect = "https://attacker.com\\@smugmug.com/api"
-    mock_session.request.return_value = MockRedirectResponse(True, malicious_redirect, 302)
+    attack_url = "https://attacker.com\\@smugmug.com/api"
+    mock_session.request.return_value = MockRedirectResponse(True, attack_url, 302)
 
     with pytest.raises(SmugMugAPIError) as exc_info:
         client._request("GET", "/test")
