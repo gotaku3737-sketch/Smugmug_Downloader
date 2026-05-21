@@ -9,6 +9,7 @@ import time
 
 
 from urllib.parse import urlparse, urljoin
+from requests.models import PreparedRequest
 
 from rich.console import Console
 
@@ -109,6 +110,12 @@ class SmugMugClient:
                         break
 
                     current_url = urljoin(current_url, redirect_target)
+
+                    # Normalize URL to prevent parsing discrepancies between urlparse and requests
+                    p = PreparedRequest()
+                    p.prepare_url(current_url, None)
+                    current_url = p.url
+
                     parsed_redir = urlparse(current_url)
                     redir_host = parsed_redir.hostname or ""
 
@@ -310,6 +317,11 @@ class SmugMugClient:
 
         # Security fix: Prevent SSRF and OAuth token leaks by validating the download URL
         try:
+            # Normalize URL to prevent parsing discrepancies between urlparse and requests
+            p = PreparedRequest()
+            p.prepare_url(url, None)
+            url = p.url
+
             parsed_url = urlparse(url)
             hostname = parsed_url.hostname or ""
             if parsed_url.scheme != "https":
@@ -334,7 +346,7 @@ class SmugMugClient:
                 # Security fix: Handle redirects manually to prevent OAuth token leaks to untrusted domains
                 redirects_followed = 0
                 max_redirects = 30
-                while response.is_redirect:
+                while getattr(response, "is_redirect", False) is True:
                     if redirects_followed >= max_redirects:
                         console.print(f"[red]Security Error: Too many redirects (>{max_redirects})[/red]")
                         return False
@@ -346,6 +358,12 @@ class SmugMugClient:
                         break
 
                     current_url = urljoin(current_url, redirect_target)
+
+                    # Normalize URL to prevent parsing discrepancies between urlparse and requests
+                    p = PreparedRequest()
+                    p.prepare_url(current_url, None)
+                    current_url = p.url
+
                     parsed_redir = urlparse(current_url)
                     redir_host = parsed_redir.hostname or ""
 
