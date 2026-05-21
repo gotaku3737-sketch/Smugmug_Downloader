@@ -176,3 +176,46 @@ def test_request_prevents_redirect_ssrf():
     assert mock_session.request.call_count == 1
     kwargs = mock_session.request.call_args[1]
     assert kwargs.get("allow_redirects") is False
+
+def test_download_file_prevents_ssrf_bypass_discrepancy():
+    from src.api_client import SmugMugClient
+    from unittest.mock import MagicMock
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # An attacker tries to use urlparse discrepancy
+    # urlparse thinks hostname is smugmug.com
+    # requests thinks hostname is attacker.com
+    malicious_url = "https://attacker.com\\@smugmug.com/image.jpg"
+
+    result = client.download_file(malicious_url, "/tmp/out")
+
+    # Should be rejected
+    assert result is False
+    assert mock_session.get.call_count == 0
+
+
+def test_request_prevents_redirect_ssrf_bypass_discrepancy():
+    from src.api_client import SmugMugClient, SmugMugAPIError
+    from unittest.mock import MagicMock
+    import pytest
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    class MockRedirectResponse:
+        def __init__(self, is_redirect, location=None, status=302):
+            self.is_redirect = is_redirect
+            self.headers = {"Location": location} if location else {}
+            self.status_code = status
+        def json(self): return {}
+
+    # Redirect to malicious URL leveraging discrepancy
+    malicious_redirect = "https://attacker.com\\@smugmug.com/api"
+    mock_session.request.return_value = MockRedirectResponse(True, malicious_redirect, 302)
+
+    with pytest.raises(SmugMugAPIError) as exc_info:
+        client._request("GET", "/test")
+
+    assert "untrusted URL" in str(exc_info.value) or "Security Error" in str(exc_info.value)

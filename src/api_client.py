@@ -9,6 +9,7 @@ import time
 
 
 from urllib.parse import urlparse, urljoin
+from requests.models import PreparedRequest
 
 from rich.console import Console
 
@@ -109,7 +110,12 @@ class SmugMugClient:
                         break
 
                     current_url = urljoin(current_url, redirect_target)
-                    parsed_redir = urlparse(current_url)
+                    p = PreparedRequest()
+                    p.prepare_url(current_url, None)
+                    prepared_redir_url = p.url
+                    if not prepared_redir_url:
+                        raise SmugMugAPIError(0, f"Security Error: Invalid Redirect URL: {current_url}")
+                    parsed_redir = urlparse(prepared_redir_url)
                     redir_host = parsed_redir.hostname or ""
 
                     if parsed_redir.scheme != "https" or not (redir_host == "smugmug.com" or redir_host.endswith(".smugmug.com")):
@@ -310,7 +316,13 @@ class SmugMugClient:
 
         # Security fix: Prevent SSRF and OAuth token leaks by validating the download URL
         try:
-            parsed_url = urlparse(url)
+            p = PreparedRequest()
+            p.prepare_url(url, None)
+            prepared_url = p.url
+            if not prepared_url:
+                console.print(f"[red]Security Error: Invalid URL format: {url}[/red]")
+                return False
+            parsed_url = urlparse(prepared_url)
             hostname = parsed_url.hostname or ""
             if parsed_url.scheme != "https":
                 console.print(f"[red]Security Error: Refusing to download from non-HTTPS URL: {url}[/red]")
@@ -334,7 +346,7 @@ class SmugMugClient:
                 # Security fix: Handle redirects manually to prevent OAuth token leaks to untrusted domains
                 redirects_followed = 0
                 max_redirects = 30
-                while response.is_redirect:
+                while getattr(response, "is_redirect", False) is True:
                     if redirects_followed >= max_redirects:
                         console.print(f"[red]Security Error: Too many redirects (>{max_redirects})[/red]")
                         return False
@@ -346,7 +358,12 @@ class SmugMugClient:
                         break
 
                     current_url = urljoin(current_url, redirect_target)
-                    parsed_redir = urlparse(current_url)
+                    p = PreparedRequest()
+                    p.prepare_url(current_url, None)
+                    prepared_redir_url = p.url
+                    if not prepared_redir_url:
+                        raise SmugMugAPIError(0, f"Security Error: Invalid Redirect URL: {current_url}")
+                    parsed_redir = urlparse(prepared_redir_url)
                     redir_host = parsed_redir.hostname or ""
 
                     if parsed_redir.scheme != "https" or not (redir_host == "smugmug.com" or redir_host.endswith(".smugmug.com")):
