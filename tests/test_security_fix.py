@@ -214,3 +214,33 @@ def test_urlparse_requests_discrepancy_redirect_bypass():
         client._request("GET", "/test")
 
     assert "untrusted URL" in str(exc_info.value) or "Security Error" in str(exc_info.value)
+
+def test_auth_timeouts_applied():
+    from src.auth import authorize
+    from unittest.mock import patch, MagicMock
+
+    with patch("src.auth.console") as mock_console:
+        mock_console.input.return_value = "123456"
+
+        with patch("src.auth.OAuth1Session") as MockOAuth:
+            mock_oauth_inst = MockOAuth.return_value
+            mock_oauth_inst.fetch_request_token.return_value = {
+                "oauth_token": "rt", "oauth_token_secret": "rts"
+            }
+            mock_oauth_inst.authorization_url.return_value = "http://auth"
+            mock_oauth_inst.fetch_access_token.return_value = {
+                "oauth_token": "at", "oauth_token_secret": "ats"
+            }
+
+            with patch("src.auth.save_tokens"):
+                authorize("key", "secret")
+
+            # Verify fetch_request_token was called with timeout=30
+            mock_oauth_inst.fetch_request_token.assert_called_once()
+            args, kwargs = mock_oauth_inst.fetch_request_token.call_args
+            assert kwargs.get("timeout") == 30
+
+            # Verify fetch_access_token was called with timeout=30
+            mock_oauth_inst.fetch_access_token.assert_called_once()
+            args, kwargs = mock_oauth_inst.fetch_access_token.call_args
+            assert kwargs.get("timeout") == 30
