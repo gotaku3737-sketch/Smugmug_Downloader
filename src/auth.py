@@ -75,7 +75,7 @@ def authorize(api_key, api_secret):
     oauth = OAuth1Session(api_key, client_secret=api_secret, callback_uri="oob")
 
     try:
-        fetch_response = oauth.fetch_request_token(REQUEST_TOKEN_URL)
+        fetch_response = oauth.fetch_request_token(REQUEST_TOKEN_URL, timeout=30)
     except Exception as e:
         console.print(f"[bold red]Failed to get request token: {e}[/bold red]")
         raise SystemExit(1)
@@ -112,7 +112,7 @@ def authorize(api_key, api_secret):
     )
 
     try:
-        tokens = oauth.fetch_access_token(ACCESS_TOKEN_URL)
+        tokens = oauth.fetch_access_token(ACCESS_TOKEN_URL, timeout=30)
     except Exception as e:
         console.print(f"[bold red]Failed to get access token: {e}[/bold red]")
         raise SystemExit(1)
