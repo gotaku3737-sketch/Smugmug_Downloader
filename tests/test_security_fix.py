@@ -244,3 +244,47 @@ def test_auth_timeouts_applied():
             mock_oauth_inst.fetch_access_token.assert_called_once()
             args, kwargs = mock_oauth_inst.fetch_access_token.call_args
             assert kwargs.get("timeout") == 30
+
+def test_download_file_uses_secure_tempfile():
+    from src.api_client import SmugMugClient
+    from unittest.mock import MagicMock, patch
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # Setup mock response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.is_redirect = False
+    mock_response.iter_content.return_value = [b"chunk1", b"chunk2"]
+    mock_response.headers = {"Content-Length": "12"}
+    mock_session.get.return_value = mock_response
+
+    with patch("tempfile.mkstemp") as mock_mkstemp, \
+         patch("os.fdopen") as mock_fdopen, \
+         patch("os.rename") as mock_rename:
+
+        # Mock mkstemp to return a dummy fd and a dummy temp path
+        mock_mkstemp.return_value = (42, "/fake/dir/target.jpg.tmp")
+
+        # Mock fdopen context manager
+        mock_file = MagicMock()
+        mock_fdopen.return_value.__enter__.return_value = mock_file
+
+        # Avoid validation failures
+        with patch("src.api_client.verify_md5", return_value=True):
+            result = client.download_file("https://api.smugmug.com/image.jpg", "/fake/dir/target.jpg", expected_size=12)
+
+        assert result is True
+
+        # Ensure mkstemp was called
+        mock_mkstemp.assert_called_once()
+        args, kwargs = mock_mkstemp.call_args
+        assert kwargs.get("dir") == "/fake/dir"
+        assert kwargs.get("prefix") == ".tmp"
+
+        # Ensure fdopen was called on the fd from mkstemp
+        mock_fdopen.assert_called_once_with(42, "wb")
+
+        # Ensure rename was called to atomically move temp to dest
+        mock_rename.assert_called_once_with("/fake/dir/target.jpg.tmp", "/fake/dir/target.jpg")

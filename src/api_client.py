@@ -314,6 +314,7 @@ class SmugMugClient:
 
         from src.config import CHUNK_SIZE
         import os
+        import tempfile
 
         # Security fix: Prevent SSRF and OAuth token leaks by validating the download URL
         try:
@@ -381,10 +382,12 @@ class SmugMugClient:
                     progress_callback.set_actual_size(total_size)
 
                 # Write to temp file first
-                temp_path = dest_path + ".tmp"
+                # Security fix: Use mkstemp to prevent symlink/TOCTOU attacks during download
+                dir_name = os.path.dirname(dest_path) or "."
+                fd, temp_path = tempfile.mkstemp(dir=dir_name, prefix=".tmp")
                 downloaded = 0
 
-                with open(temp_path, "wb") as f:
+                with os.fdopen(fd, "wb") as f:
                     for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
                         if chunk:
                             f.write(chunk)
@@ -421,8 +424,7 @@ class SmugMugClient:
                 time.sleep(wait_time)
 
                 # Clean up temp file
-                temp_path = dest_path + ".tmp"
-                if os.path.exists(temp_path):
+                if 'temp_path' in locals() and os.path.exists(temp_path):
                     os.remove(temp_path)
 
         return False
