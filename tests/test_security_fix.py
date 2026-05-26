@@ -245,46 +245,30 @@ def test_auth_timeouts_applied():
             args, kwargs = mock_oauth_inst.fetch_access_token.call_args
             assert kwargs.get("timeout") == 30
 
-def test_download_file_uses_secure_tempfile():
-    from src.api_client import SmugMugClient
+def test_download_file_uses_mkstemp():
+    import sys
     from unittest.mock import MagicMock, patch
+    from src.api_client import SmugMugClient
 
     mock_session = MagicMock()
     client = SmugMugClient(mock_session)
 
-    # Setup mock response
+    # Mock response
     mock_response = MagicMock()
     mock_response.status_code = 200
+    mock_response.headers = {"Content-Length": "10"}
     mock_response.is_redirect = False
-    mock_response.iter_content.return_value = [b"chunk1", b"chunk2"]
-    mock_response.headers = {"Content-Length": "12"}
+    mock_response.iter_content.return_value = [b"1234567890"]
     mock_session.get.return_value = mock_response
 
-    with patch("tempfile.mkstemp") as mock_mkstemp, \
-         patch("os.fdopen") as mock_fdopen, \
-         patch("os.rename") as mock_rename:
-
-        # Mock mkstemp to return a dummy fd and a dummy temp path
-        mock_mkstemp.return_value = (42, "/fake/dir/target.jpg.tmp")
-
-        # Mock fdopen context manager
+    with patch("tempfile.mkstemp") as mock_mkstemp, patch("os.fdopen") as mock_fdopen, patch("os.replace") as mock_replace, patch("os.makedirs"):
+        mock_mkstemp.return_value = (42, "/tmp/some_dir/mock.tmp")
         mock_file = MagicMock()
         mock_fdopen.return_value.__enter__.return_value = mock_file
 
-        # Avoid validation failures
-        with patch("src.api_client.verify_md5", return_value=True):
-            result = client.download_file("https://api.smugmug.com/image.jpg", "/fake/dir/target.jpg", expected_size=12)
+        result = client.download_file("https://api.smugmug.com/image.jpg", "/tmp/some_dir/out.jpg")
 
         assert result is True
-
-        # Ensure mkstemp was called
-        mock_mkstemp.assert_called_once()
-        args, kwargs = mock_mkstemp.call_args
-        assert kwargs.get("dir") == "/fake/dir"
-        assert kwargs.get("prefix") == ".tmp"
-
-        # Ensure fdopen was called on the fd from mkstemp
+        mock_mkstemp.assert_called_once_with(dir="/tmp/some_dir", suffix=".tmp")
         mock_fdopen.assert_called_once_with(42, "wb")
-
-        # Ensure rename was called to atomically move temp to dest
-        mock_rename.assert_called_once_with("/fake/dir/target.jpg.tmp", "/fake/dir/target.jpg")
+        mock_replace.assert_called_once_with("/tmp/some_dir/mock.tmp", "/tmp/some_dir/out.jpg")
