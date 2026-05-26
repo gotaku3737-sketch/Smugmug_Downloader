@@ -314,6 +314,7 @@ class SmugMugClient:
 
         from src.config import CHUNK_SIZE
         import os
+        import tempfile
 
         # Security fix: Prevent SSRF and OAuth token leaks by validating the download URL
         try:
@@ -381,37 +382,47 @@ class SmugMugClient:
                     progress_callback.set_actual_size(total_size)
 
                 # Write to temp file first
-                temp_path = dest_path + ".tmp"
                 downloaded = 0
 
-                with open(temp_path, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
-                        if chunk:
-                            f.write(chunk)
-                            downloaded += len(chunk)
-                            if progress_callback:
-                                progress_callback(len(chunk))
+                dir_name = os.path.dirname(dest_path)
+                if dir_name:
+                    os.makedirs(dir_name, exist_ok=True)
+                fd, temp_path = tempfile.mkstemp(dir=dir_name, suffix=".tmp")
 
-                # Verify size if known
-                if total_size and downloaded != total_size:
-                    console.print(
-                        f"[yellow]Size mismatch: expected {total_size}, "
-                        f"got {downloaded}. Retrying...[/yellow]"
-                    )
-                    os.remove(temp_path)
-                    continue
+                try:
+                    with os.fdopen(fd, "wb") as f:
+                        for chunk in response.iter_content(chunk_size=CHUNK_SIZE):
+                            if chunk:
+                                f.write(chunk)
+                                downloaded += len(chunk)
+                                if progress_callback:
+                                    progress_callback(len(chunk))
 
-                # Verify MD5 if known
-                if expected_md5 and not verify_md5(temp_path, expected_md5):
-                    console.print(
-                        f"[yellow]MD5 mismatch: expected {expected_md5}. Retrying...[/yellow]"
-                    )
-                    os.remove(temp_path)
-                    continue
+                    # Verify size if known
+                    if total_size and downloaded != total_size:
+                        console.print(
+                            f"[yellow]Size mismatch: expected {total_size}, "
+                            f"got {downloaded}. Retrying...[/yellow]"
+                        )
+                        os.remove(temp_path)
+                        continue
 
-                # Rename temp to final
-                os.rename(temp_path, dest_path)
-                return True
+                    # Verify MD5 if known
+                    if expected_md5 and not verify_md5(temp_path, expected_md5):
+                        console.print(
+                            f"[yellow]MD5 mismatch: expected {expected_md5}. Retrying...[/yellow]"
+                        )
+                        os.remove(temp_path)
+                        continue
+
+                    # Rename temp to final (atomic)
+                    os.replace(temp_path, dest_path)
+                    return True
+                except Exception:
+                    # Clean up temp file on internal failure if not already cleaned
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                    raise
 
             except Exception as e:
                 wait_time = RETRY_BACKOFF * (2 ** attempt)
@@ -419,10 +430,5 @@ class SmugMugClient:
                     f"[yellow]Download error: {e}. Retrying in {wait_time}s...[/yellow]"
                 )
                 time.sleep(wait_time)
-
-                # Clean up temp file
-                temp_path = dest_path + ".tmp"
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
 
         return False

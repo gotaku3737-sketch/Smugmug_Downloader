@@ -244,3 +244,31 @@ def test_auth_timeouts_applied():
             mock_oauth_inst.fetch_access_token.assert_called_once()
             args, kwargs = mock_oauth_inst.fetch_access_token.call_args
             assert kwargs.get("timeout") == 30
+
+def test_download_file_uses_mkstemp():
+    import sys
+    from unittest.mock import MagicMock, patch
+    from src.api_client import SmugMugClient
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # Mock response
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Length": "10"}
+    mock_response.is_redirect = False
+    mock_response.iter_content.return_value = [b"1234567890"]
+    mock_session.get.return_value = mock_response
+
+    with patch("tempfile.mkstemp") as mock_mkstemp, patch("os.fdopen") as mock_fdopen, patch("os.replace") as mock_replace, patch("os.makedirs"):
+        mock_mkstemp.return_value = (42, "/tmp/some_dir/mock.tmp")
+        mock_file = MagicMock()
+        mock_fdopen.return_value.__enter__.return_value = mock_file
+
+        result = client.download_file("https://api.smugmug.com/image.jpg", "/tmp/some_dir/out.jpg")
+
+        assert result is True
+        mock_mkstemp.assert_called_once_with(dir="/tmp/some_dir", suffix=".tmp")
+        mock_fdopen.assert_called_once_with(42, "wb")
+        mock_replace.assert_called_once_with("/tmp/some_dir/mock.tmp", "/tmp/some_dir/out.jpg")
