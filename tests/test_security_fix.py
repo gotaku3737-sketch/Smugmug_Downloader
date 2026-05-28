@@ -272,3 +272,26 @@ def test_download_file_uses_mkstemp():
         mock_mkstemp.assert_called_once_with(dir="/tmp/some_dir", suffix=".tmp")
         mock_fdopen.assert_called_once_with(42, "wb")
         mock_replace.assert_called_once_with("/tmp/some_dir/mock.tmp", "/tmp/some_dir/out.jpg")
+
+def test_verify_md5_usedforsecurity_false():
+    import tempfile
+    import os
+    from unittest.mock import patch
+    from src.api_client import verify_md5
+
+    with tempfile.NamedTemporaryFile(delete=False) as f:
+        f.write(b"testdata")
+        filepath = f.name
+
+    try:
+        with patch("src.api_client.hashlib.md5") as mock_md5:
+            # We must mock it so it returns something that has 'update' and 'hexdigest'
+            mock_hash_obj = mock_md5.return_value
+            mock_hash_obj.hexdigest.return_value = "dummy"
+
+            verify_md5(filepath, "dummy")
+
+            # Check that it tried to call md5(usedforsecurity=False)
+            mock_md5.assert_called_once_with(usedforsecurity=False)
+    finally:
+        os.remove(filepath)

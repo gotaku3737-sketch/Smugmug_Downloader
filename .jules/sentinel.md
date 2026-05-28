@@ -40,3 +40,8 @@
 **Vulnerability:** The `download_file` method in `src/api_client.py` created temporary files using predictable paths (`dest_path + ".tmp"`) and the standard `open(..., "wb")` function. It also finalized the download with `os.rename()`. This introduced a Time-Of-Check to Time-Of-Use (TOCTOU) race condition and potential for symlink attacks, as an attacker with local access could predict the temp file name and manipulate it before or during the write process.
 **Learning:** Temporary files should never be created using predictable names or standard `open()` because of inherent race conditions and symlink vulnerabilities. Standard file rename functions like `os.rename()` may not guarantee an atomic replacement.
 **Prevention:** Always use `tempfile.mkstemp(dir=..., suffix=...)` paired with `os.fdopen(fd, "wb")` to ensure unique, unpredictable, and atomically created temporary files with restrictive permissions. Finish file transfers by explicitly using `os.replace()` for an atomic overwrite.
+
+## 2024-05-28 - Insecure MD5 Hash Usage
+**Vulnerability:** The application used `hashlib.md5()` without explicitly marking it as not used for security (`usedforsecurity=False`), causing potential crashes in FIPS-compliant environments where MD5 is restricted.
+**Learning:** When using deprecated hashing algorithms like MD5 strictly for non-security purposes (like file integrity checks), they must be explicitly flagged to prevent runtime errors on hardened systems.
+**Prevention:** Always use `hashlib.md5(usedforsecurity=False)` when verifying file checksums to ensure compatibility with FIPS mode while maintaining security compliance.

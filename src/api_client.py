@@ -32,7 +32,10 @@ def verify_md5(file_path, expected_md5):
     if not expected_md5:
         return True
     try:
-        hash_md5 = hashlib.md5()
+        try:
+            hash_md5 = hashlib.md5(usedforsecurity=False)
+        except TypeError:
+            hash_md5 = hashlib.md5()  # nosec B324
         with open(file_path, "rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
                 hash_md5.update(chunk)
