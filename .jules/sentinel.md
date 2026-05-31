@@ -45,3 +45,8 @@
 **Vulnerability:** The application used `hashlib.md5()` without explicitly marking it as not used for security (`usedforsecurity=False`), causing potential crashes in FIPS-compliant environments where MD5 is restricted.
 **Learning:** When using deprecated hashing algorithms like MD5 strictly for non-security purposes (like file integrity checks), they must be explicitly flagged to prevent runtime errors on hardened systems.
 **Prevention:** Always use `hashlib.md5(usedforsecurity=False)` when verifying file checksums to ensure compatibility with FIPS mode while maintaining security compliance.
+
+## 2026-05-28 - Terminal Injection via Rich Markup
+**Vulnerability:** The application is using user-controlled, external data from the API to construct output to the terminal utilizing the `rich` library. Variables like `filename`, `album_name`, `nickname`, and `display_name` are printed directly to the console or used to create Progress tasks. If an attacker controls the SmugMug API or the data returned, they could inject Rich markup tags (e.g. `[red]`, `[link=...]`, `[bold]`) into these fields. While `rich` doesn't execute arbitrary code, this allows an attacker to manipulate the terminal output, potentially spoofing log messages. Furthermore, an unclosed or invalid tag (e.g., `[my album name]`) could cause the application to raise an exception or display the text incorrectly, resulting in a Denial of Service or logic bug.
+**Learning:** All external inputs should be escaped before being rendered by libraries that support terminal formatting/markup, such as `rich`.
+**Prevention:** Use `rich.markup.escape()` on any variable that originated from an external source before interpolating it into a string that will be printed or used in a `rich` component.

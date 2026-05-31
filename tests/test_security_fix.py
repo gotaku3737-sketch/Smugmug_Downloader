@@ -295,3 +295,100 @@ def test_verify_md5_usedforsecurity_false():
             mock_md5.assert_called_once_with(usedforsecurity=False)
     finally:
         os.remove(filepath)
+
+def test_downloader_rich_terminal_injection():
+    # Remove the global mock of rich temporarily so we can import src.downloader properly
+    import sys
+    orig_rich = sys.modules.pop("rich", None)
+    orig_rich_console = sys.modules.pop("rich.console", None)
+
+    try:
+        from src.downloader import list_albums, run_download
+        from src.tracker import DownloadTracker
+        from unittest.mock import MagicMock, patch
+        from rich.markup import escape
+
+        # Create dummy client
+        mock_client = MagicMock()
+        mock_client.get_authenticated_user.return_value = {
+            "NickName": "[red]hacker[/red]",
+            "Name": "[link=http://attacker.com]malicious[/link]"
+        }
+
+        mock_client.get_user_albums.return_value = [{
+            "Name": "[invalid tag] album",
+            "AlbumKey": "123",
+            "ImageCount": 5,
+            "SecurityType": "Public"
+        }]
+
+        # We'll patch Table to capture what gets added to the table
+        with patch("src.downloader.Table") as MockTable:
+            mock_table_instance = MockTable.return_value
+
+            with patch("src.downloader.console") as mock_console:
+                list_albums(mock_client)
+
+                # Check the table.add_row arguments were escaped
+                mock_table_instance.add_row.assert_called_once()
+                args = mock_table_instance.add_row.call_args[0]
+
+                # str(idx), escape(Name), escape(Key), str(ImageCount), escape(SecurityType)
+                assert escape("[invalid tag] album") in args
+
+                # Check the print statement for the user info was escaped
+                printed_strs = [call[0][0] for call in mock_console.print.call_args_list if isinstance(call[0][0], str)]
+                user_info_str = next(s for s in printed_strs if "Logged in as" in s)
+
+                assert escape("[red]hacker[/red]") in user_info_str
+                assert escape("[link=http://attacker.com]malicious[/link]") in user_info_str
+    finally:
+        if orig_rich: sys.modules["rich"] = orig_rich
+        if orig_rich_console: sys.modules["rich.console"] = orig_rich_console
+
+def test_downloader_progress_injection():
+    # Remove the global mock of rich temporarily
+    import sys
+    orig_rich = sys.modules.pop("rich", None)
+    orig_rich_console = sys.modules.pop("rich.console", None)
+
+    try:
+        from src.downloader import download_album_images, download_image_worker
+        from src.tracker import DownloadTracker
+        from unittest.mock import MagicMock, patch
+        from rich.markup import escape
+        import tempfile
+
+        mock_client = MagicMock()
+        mock_client.get_album_images.return_value = [{
+            "ImageKey": "img1",
+            "FileName": "[red]malicious[/red].jpg"
+        }]
+        mock_tracker = MagicMock()
+        mock_tracker.is_album_done.return_value = False
+        mock_tracker.is_image_done.return_value = False
+
+        mock_progress = MagicMock()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            download_album_images(mock_client, mock_tracker, {"Name": "[bad] album"}, tmpdir, "123", mock_progress, 0, workers=1)
+
+            # Verify album_task_id was created with escaped album name
+            mock_progress.add_task.assert_called()
+            add_task_calls = mock_progress.add_task.call_args_list
+
+            album_task_call = next(call for call in add_task_calls if "📷" in call[0][0])
+            assert escape("[bad] album") in album_task_call[0][0]
+
+            # Since the workers run in thread, to reliably test the sub_task_id escaping we can just call the worker directly
+            mock_progress.reset_mock()
+            download_image_worker(
+                mock_client, mock_tracker, {"ImageKey": "img2", "FileName": "[bad]file.jpg"},
+                "123", tmpdir, mock_progress, 1, 2
+            )
+
+            sub_task_call = next(call for call in mock_progress.add_task.call_args_list if "↳" in call[0][0])
+            assert escape("[bad]file.jpg") in sub_task_call[0][0]
+    finally:
+        if orig_rich: sys.modules["rich"] = orig_rich
+        if orig_rich_console: sys.modules["rich.console"] = orig_rich_console
