@@ -18,6 +18,7 @@ from rich.progress import (
     TransferSpeedColumn,
 )
 from rich.table import Table
+from rich.markup import escape
 
 from src.api_client import SmugMugClient, verify_md5
 from src.tracker import DownloadTracker
@@ -124,7 +125,7 @@ def list_albums(client):
 
     nickname = user.get("NickName", "")
     display_name = user.get("Name", nickname)
-    console.print(f"\n[bold]Logged in as:[/bold] {display_name} ({nickname})\n")
+    console.print(f"\n[bold]Logged in as:[/bold] {escape(display_name)} ({escape(nickname)})\n")
 
     with console.status("[bold cyan]Fetching albums..."):
         albums = client.get_user_albums(nickname)
@@ -143,10 +144,10 @@ def list_albums(client):
     for idx, album in enumerate(albums, 1):
         table.add_row(
             str(idx),
-            album.get("Name", "Unknown"),
-            extract_album_key(album),
+            escape(album.get("Name", "Unknown")),
+            escape(extract_album_key(album)),
             str(album.get("ImageCount", "?")),
-            album.get("SecurityType", "?"),
+            escape(album.get("SecurityType", "?")),
         )
 
     console.print(table)
@@ -192,10 +193,10 @@ def show_status(output_dir):
             "done": "[green]✓ done[/green]",
             "in_progress": "[yellow]⧗ in progress[/yellow]",
             "pending": "[dim]○ pending[/dim]",
-        }.get(album["status"], album["status"])
+        }.get(album["status"], escape(album["status"]))
 
         table.add_row(
-            album["name"],
+            escape(album["name"]),
             status_icon,
             f"{album['done']}/{album['total']}",
             str(album["failed"]) if album["failed"] else "-",
@@ -295,14 +296,14 @@ def download_image_worker(client, tracker, image, album_key, album_dir, progress
         download_url = client.get_image_download_url(image_key)
 
     if not download_url:
-        progress.console.print(f"  [red]✗ No download URL for {filename}[/red]")
+        progress.console.print(f"  [red]✗ No download URL for {escape(filename)}[/red]")
         tracker.set_image_status(album_key, image_key, "failed")
         progress.update(album_task_id, total=next((t.total for t in progress.tasks if t.id == album_task_id), 0) - est_size)
         progress.update(global_task_id, total=next((t.total for t in progress.tasks if t.id == global_task_id), 0) - est_size)
         return "failed"
 
     # 4. Set up dynamic sub-task
-    sub_task_id = progress.add_task(f"  ↳ {filename}", total=est_size, visible=True)
+    sub_task_id = progress.add_task(f"  ↳ {escape(filename)}", total=est_size, visible=True)
     cb = ProgressCallback(progress, sub_task_id, album_task_id, global_task_id, est_size)
 
     # 5. Download the file
@@ -366,7 +367,7 @@ def download_album_images(client, tracker, album, output_dir, album_key, progres
     # Update global task total and add album task
     global_total = next((t.total for t in progress.tasks if t.id == global_task_id), 0)
     progress.update(global_task_id, total=global_total + album_est_bytes)
-    album_task_id = progress.add_task(f"📷 {album_name}", total=album_est_bytes)
+    album_task_id = progress.add_task(f"📷 {escape(album_name)}", total=album_est_bytes)
 
     downloaded = 0
     skipped = 0
@@ -432,7 +433,7 @@ def run_download(client, output_dir, album_filter=None, workers=DEFAULT_WORKERS)
 
     nickname = user.get("NickName", "")
     display_name = user.get("Name", nickname)
-    console.print(f"\n[bold]Logged in as:[/bold] {display_name} ({nickname})")
+    console.print(f"\n[bold]Logged in as:[/bold] {escape(display_name)} ({escape(nickname)})")
 
     # Fetch all albums
     with console.status("[bold cyan]Fetching albums..."):
@@ -479,14 +480,14 @@ def run_download(client, output_dir, album_filter=None, workers=DEFAULT_WORKERS)
             # Skip fully downloaded albums
             if tracker.is_album_done(album_key):
                 progress.console.print(
-                    f"[dim]  [{idx}/{len(albums)}] {album_name} — "
+                    f"[dim]  [{idx}/{len(albums)}] {escape(album_name)} — "
                     f"already complete, skipping[/dim]"
                 )
                 continue
 
             progress.console.print(
                 f"\n[bold cyan]  [{idx}/{len(albums)}] Downloading: "
-                f"{album_name}[/bold cyan]"
+                f"{escape(album_name)}[/bold cyan]"
             )
 
             try:

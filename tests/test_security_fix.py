@@ -295,3 +295,62 @@ def test_verify_md5_usedforsecurity_false():
             mock_md5.assert_called_once_with(usedforsecurity=False)
     finally:
         os.remove(filepath)
+
+def test_rich_markup_injection_prevention():
+    import sys
+    from unittest.mock import patch, MagicMock
+
+    # Temporarily remove rich mock to allow real imports for this test
+    # We need the real escape function and real progress imports
+    had_rich = "rich" in sys.modules
+    had_rich_console = "rich.console" in sys.modules
+
+    if had_rich:
+        rich_mock = sys.modules.pop("rich")
+    if had_rich_console:
+        rich_console_mock = sys.modules.pop("rich.console")
+
+    try:
+        import src.downloader
+
+        with patch("src.downloader.console.print") as mock_print:
+            # Mock client to return potentially dangerous display name and nickname
+            mock_client = MagicMock()
+            mock_client.get_authenticated_user.return_value = {
+                "NickName": "[red]Hacker[/red]",
+                "Name": "[blue]Attack[/blue]"
+            }
+            mock_client.get_user_albums.return_value = []
+
+            src.downloader.list_albums(mock_client)
+
+            # The print should escape the tags, avoiding markup injection
+            # Expected: \n[bold]Logged in as:[/bold] \[blue]Attack\[/blue] (\[red]Hacker\[/red])\n
+
+            # Note: list_albums calls print multiple times, let's find the specific one
+            found_auth_print = False
+            for call_args in mock_print.call_args_list:
+                args = call_args[0]
+                if args and isinstance(args[0], str) and "Logged in as" in args[0]:
+                    assert r"\[blue]Attack\[/blue]" in args[0]
+                    assert r"\[red]Hacker\[/red]" in args[0]
+                    found_auth_print = True
+
+            assert found_auth_print
+
+        with patch("src.downloader.Table.add_row") as mock_add_row:
+            mock_client.get_authenticated_user.return_value = {"NickName": "test"}
+            mock_client.get_user_albums.return_value = [
+                {"Name": "[green]Malicious Album[/green]", "SecurityType": "[bold]Public[/bold]", "AlbumKey": "key"}
+            ]
+
+            src.downloader.list_albums(mock_client)
+
+            called_args = mock_add_row.call_args[0]
+            assert r"\[green]Malicious Album\[/green]" in called_args
+            assert r"\[bold]Public\[/bold]" in called_args
+    finally:
+        if had_rich:
+            sys.modules["rich"] = rich_mock
+        if had_rich_console:
+            sys.modules["rich.console"] = rich_console_mock
