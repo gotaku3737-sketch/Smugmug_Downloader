@@ -19,6 +19,7 @@ from rich.progress import (
     TransferSpeedColumn,
 )
 from rich.table import Table
+from rich.markup import escape
 
 from src.api_client import SmugMugClient, verify_md5
 from src.tracker import DownloadTracker
