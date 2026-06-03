@@ -7,6 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from rich.console import Console
+from rich.markup import escape
 from rich.progress import (
     BarColumn,
     DownloadColumn,
@@ -123,9 +124,9 @@ def list_albums(client):
     with console.status("[bold cyan]Fetching user info..."):
         user = client.get_authenticated_user()
 
-    nickname = escape(user.get("NickName", ""))
-    display_name = escape(user.get("Name", user.get("NickName", "")))
-    console.print(f"\n[bold]Logged in as:[/bold] {display_name} ({nickname})\n")
+    nickname = user.get("NickName", "")
+    display_name = user.get("Name", nickname)
+    console.print(f"\n[bold]Logged in as:[/bold] {escape(display_name)} ({escape(nickname)})\n")
 
     with console.status("[bold cyan]Fetching albums..."):
         albums = client.get_user_albums(nickname)
@@ -146,7 +147,7 @@ def list_albums(client):
             str(idx),
             escape(album.get("Name", "Unknown")),
             escape(extract_album_key(album)),
-            str(album.get("ImageCount", "?")),
+            escape(str(album.get("ImageCount", "?"))),
             escape(album.get("SecurityType", "?")),
         )
 
@@ -396,7 +397,7 @@ def download_album_images(client, tracker, album, output_dir, album_key, progres
                         failed += 1
                 except Exception as e:
                     failed += 1
-                    progress.console.print(f"[red]Error downloading image: {e}[/red]")
+                    progress.console.print(f"[red]Error downloading image: {escape(str(e))}[/red]")
     except KeyboardInterrupt:
         for future in futures:
             future.cancel()
@@ -431,9 +432,9 @@ def run_download(client, output_dir, album_filter=None, workers=DEFAULT_WORKERS)
     with console.status("[bold cyan]Fetching user info..."):
         user = client.get_authenticated_user()
 
-    nickname = escape(user.get("NickName", ""))
-    display_name = escape(user.get("Name", user.get("NickName", "")))
-    console.print(f"\n[bold]Logged in as:[/bold] {display_name} ({nickname})")
+    nickname = user.get("NickName", "")
+    display_name = user.get("Name", nickname)
+    console.print(f"\n[bold]Logged in as:[/bold] {escape(display_name)} ({escape(nickname)})")
 
     # Fetch all albums
     with console.status("[bold cyan]Fetching albums..."):
@@ -451,7 +452,7 @@ def run_download(client, output_dir, album_filter=None, workers=DEFAULT_WORKERS)
         ]
         if not albums:
             console.print(
-                f"[yellow]No albums matching '{album_filter}' found.[/yellow]"
+                f"[yellow]No albums matching '{escape(album_filter)}' found.[/yellow]"
             )
             return
 
