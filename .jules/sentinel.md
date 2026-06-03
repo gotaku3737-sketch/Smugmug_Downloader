@@ -45,3 +45,8 @@
 **Vulnerability:** The application used `hashlib.md5()` without explicitly marking it as not used for security (`usedforsecurity=False`), causing potential crashes in FIPS-compliant environments where MD5 is restricted.
 **Learning:** When using deprecated hashing algorithms like MD5 strictly for non-security purposes (like file integrity checks), they must be explicitly flagged to prevent runtime errors on hardened systems.
 **Prevention:** Always use `hashlib.md5(usedforsecurity=False)` when verifying file checksums to ensure compatibility with FIPS mode while maintaining security compliance.
+
+## 2024-06-03 - Prevent Rich Markup Injection (Terminal Output Injection)
+**Vulnerability:** External inputs (such as file paths, album names, filenames) were being formatted directly into `rich` library output strings like `console.print(f"Downloading {filename}")`. If these strings contain `rich` markup tags (like `[bold]`, `[red]`), `rich` would parse and render them, causing terminal formatting issues, hiding text, or potentially causing denial-of-service/crashes by injecting mismatched or invalid tags.
+**Learning:** This is a form of Terminal Output Injection where untrusted input alters the rendering semantics of a terminal UI framework. Any data that is not explicitly controlled by the developer (e.g., from APIs, OS environment, file paths) must be sanitized before being evaluated by `rich`'s markup parser.
+**Prevention:** Always use `rich.markup.escape()` to sanitize any untrusted or variable input before interpolating it into a format string passed to `rich` components (like `console.print()`, `Table.add_row()`, or `Progress.add_task()`).
