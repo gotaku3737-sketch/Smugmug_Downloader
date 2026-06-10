@@ -12,6 +12,7 @@ from urllib.parse import urlparse, urljoin
 from requests.models import PreparedRequest
 
 from rich.console import Console
+from rich.markup import escape
 
 
 from src.config import BASE_URL, API_ROOT, PAGE_SIZE, MAX_RETRIES, RETRY_BACKOFF
@@ -81,7 +82,7 @@ class SmugMugClient:
         """
         # Security fix: Prevent SSRF via manipulated endpoint paths (e.g. NextPage)
         if not endpoint.startswith("/"):
-            raise SmugMugAPIError(0, f"Security Error: Invalid endpoint '{endpoint}'. Must start with '/'")
+            raise SmugMugAPIError(0, f"Security Error: Invalid endpoint '{escape(endpoint)}'. Must start with '/'")
         url = f"{self.base_url}{endpoint}"
 
         if params is None:
@@ -123,7 +124,7 @@ class SmugMugClient:
                     redir_host = parsed_redir.hostname or ""
 
                     if parsed_redir.scheme != "https" or not (redir_host == "smugmug.com" or redir_host.endswith(".smugmug.com")):
-                        raise SmugMugAPIError(0, f"Security Error: Refusing redirect to untrusted URL: {current_url}")
+                        raise SmugMugAPIError(0, f"Security Error: Refusing redirect to untrusted URL: {escape(current_url)}")
 
                     # Determine correct HTTP method for redirect per HTTP spec
                     if response.status_code in (301, 302, 303):
@@ -166,12 +167,12 @@ class SmugMugClient:
                 last_error = e
                 wait_time = RETRY_BACKOFF * (2 ** attempt)
                 console.print(
-                    f"[yellow]Connection error: {e}. Retrying in {wait_time}s...[/yellow]"
+                    f"[yellow]Connection error: {escape(str(e))}. Retrying in {wait_time}s...[/yellow]"
                 )
                 time.sleep(wait_time)
                 continue
 
-        raise SmugMugAPIError(0, f"Max retries exceeded. Last error: {last_error}")
+        raise SmugMugAPIError(0, f"Max retries exceeded. Last error: {escape(str(last_error))}")
 
     def _paginate(self, endpoint, params=None, response_key=None):
         """Fetch all pages of a paginated API endpoint.
@@ -329,13 +330,13 @@ class SmugMugClient:
             parsed_url = urlparse(url)
             hostname = parsed_url.hostname or ""
             if parsed_url.scheme != "https":
-                console.print(f"[red]Security Error: Refusing to download from non-HTTPS URL: {url}[/red]")
+                console.print(f"[red]Security Error: Refusing to download from non-HTTPS URL: {escape(url)}[/red]")
                 return False
             if not (hostname == "smugmug.com" or hostname.endswith(".smugmug.com")):
-                console.print(f"[red]Security Error: Refusing to download from untrusted hostname: {hostname}[/red]")
+                console.print(f"[red]Security Error: Refusing to download from untrusted hostname: {escape(hostname)}[/red]")
                 return False
         except Exception as e:
-            console.print(f"[red]Security Error: Invalid URL format: {url}[/red]")
+            console.print(f"[red]Security Error: Invalid URL format: {escape(url)}[/red]")
             return False
 
 
@@ -372,7 +373,7 @@ class SmugMugClient:
                     redir_host = parsed_redir.hostname or ""
 
                     if parsed_redir.scheme != "https" or not (redir_host == "smugmug.com" or redir_host.endswith(".smugmug.com")):
-                        console.print(f"[red]Security Error: Refusing redirect to untrusted URL: {current_url}[/red]")
+                        console.print(f"[red]Security Error: Refusing redirect to untrusted URL: {escape(current_url)}[/red]")
                         return False
 
                     response = self.session.get(current_url, stream=True, timeout=60, allow_redirects=False)
@@ -413,7 +414,7 @@ class SmugMugClient:
                     # Verify MD5 if known
                     if expected_md5 and not verify_md5(temp_path, expected_md5):
                         console.print(
-                            f"[yellow]MD5 mismatch: expected {expected_md5}. Retrying...[/yellow]"
+                            f"[yellow]MD5 mismatch: expected {escape(expected_md5)}. Retrying...[/yellow]"
                         )
                         os.remove(temp_path)
                         continue
@@ -430,7 +431,7 @@ class SmugMugClient:
             except Exception as e:
                 wait_time = RETRY_BACKOFF * (2 ** attempt)
                 console.print(
-                    f"[yellow]Download error: {e}. Retrying in {wait_time}s...[/yellow]"
+                    f"[yellow]Download error: {escape(str(e))}. Retrying in {wait_time}s...[/yellow]"
                 )
                 time.sleep(wait_time)
 
