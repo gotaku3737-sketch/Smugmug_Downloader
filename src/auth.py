@@ -14,6 +14,7 @@ import os
 
 from requests_oauthlib import OAuth1Session
 from rich.console import Console
+from rich.markup import escape
 
 from src.config import (
     ACCESS_TOKEN_URL,
@@ -57,7 +58,7 @@ def save_tokens(tokens):
             f"[dim]Tokens saved to {TOKEN_FILE}[/dim]"
         )
     except OSError as e:
-        console.print(f"[yellow]Warning: Could not save tokens: {e}[/yellow]")
+        console.print(f"[yellow]Warning: Could not save tokens: {escape(str(e))}[/yellow]")
 
 
 def authorize(api_key, api_secret):
@@ -77,7 +78,7 @@ def authorize(api_key, api_secret):
     try:
         fetch_response = oauth.fetch_request_token(REQUEST_TOKEN_URL, timeout=30)
     except Exception as e:
-        console.print(f"[bold red]Failed to get request token: {e}[/bold red]")
+        console.print(f"[bold red]Failed to get request token: {escape(str(e))}[/bold red]")
         raise SystemExit(1)
 
     resource_owner_key = fetch_response.get("oauth_token")
@@ -91,7 +92,7 @@ def authorize(api_key, api_secret):
     console.print(
         "\n[bold]Please visit this URL in your browser to authorize the app:[/bold]"
     )
-    console.print(f"[link={authorization_url}]{authorization_url}[/link]\n")
+    console.print(f"[link={escape(authorization_url)}]{escape(authorization_url)}[/link]\n")
 
     # Step 3: User enters verification code
     verifier = console.input(
@@ -114,7 +115,7 @@ def authorize(api_key, api_secret):
     try:
         tokens = oauth.fetch_access_token(ACCESS_TOKEN_URL, timeout=30)
     except Exception as e:
-        console.print(f"[bold red]Failed to get access token: {e}[/bold red]")
+        console.print(f"[bold red]Failed to get access token: {escape(str(e))}[/bold red]")
         raise SystemExit(1)
 
     console.print("[bold green]✓ Authorization successful![/bold green]")
