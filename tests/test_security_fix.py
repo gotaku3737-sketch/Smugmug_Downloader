@@ -7,6 +7,8 @@ import sys
 mock_rich = MagicMock()
 sys.modules["rich"] = mock_rich
 sys.modules["rich.console"] = mock_rich.console
+sys.modules["rich.markup"] = mock_rich.markup
+sys.modules["rich.markup.escape"] = mock_rich.markup.escape
 sys.modules["requests_oauthlib"] = MagicMock()
 
 import src.config
@@ -314,3 +316,19 @@ def test_terminal_injection_prevention():
     assert "escape(filename)" in downloader_code
     assert "escape(album_name)" in downloader_code
     assert "escape(str(e))" in downloader_code
+
+    with open("src/api_client.py", "r") as f:
+        api_client_code = f.read()
+
+    assert "from rich.markup import escape" in api_client_code
+    assert "escape(url)" in api_client_code
+    assert "escape(hostname)" in api_client_code
+    assert "escape(current_url)" in api_client_code
+    assert "escape(str(e))" in api_client_code
+
+    with open("src/auth.py", "r") as f:
+        auth_code = f.read()
+
+    assert "from rich.markup import escape" in auth_code
+    assert "escape(str(e))" in auth_code
+    assert "escape(authorization_url)" in auth_code
