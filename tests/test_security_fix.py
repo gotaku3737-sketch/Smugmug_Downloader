@@ -314,3 +314,18 @@ def test_terminal_injection_prevention():
     assert "escape(filename)" in downloader_code
     assert "escape(album_name)" in downloader_code
     assert "escape(str(e))" in downloader_code
+
+    with open("src/api_client.py", "r") as f:
+        api_client_code = f.read()
+    assert "from rich.markup import escape" in api_client_code
+    assert "escape(endpoint)" in api_client_code or "escape(" in api_client_code
+
+    with open("src/auth.py", "r") as f:
+        auth_code = f.read()
+    assert "from rich.markup import escape" in auth_code
+    assert "escape(" in auth_code
+
+    with open("src/cli.py", "r") as f:
+        cli_code = f.read()
+    assert "from rich.markup import escape" in cli_code
+    assert "escape(" in cli_code
