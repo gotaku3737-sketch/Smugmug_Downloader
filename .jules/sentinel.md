@@ -50,3 +50,7 @@
 **Vulnerability:** The codebase used the `rich` library (`console.print`, `Table.add_row`, `Progress.add_task`) to display user-controlled inputs (API responses, filenames, album names, exception messages) directly without escaping. Because `rich` supports markup (like `[red]`), an attacker could craft malicious input to cause terminal injection, corrupt display, or hide text.
 **Learning:** High-level terminal output libraries often support markup by default. Unsanitized data passed directly to these libraries is susceptible to terminal output injection attacks.
 **Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs before passing them into display functions that evaluate markup.
+## 2025-02-28 - [Terminal Output Injection via Rich library]
+**Vulnerability:** The codebase used the `rich` library (`console.print`) to display user-controlled or external inputs (API responses, URLs, hostnames, exception messages, paths) directly without escaping in `src/api_client.py`, `src/auth.py`, and `src/cli.py`. Because `rich` supports markup (like `[red]`), an attacker could craft malicious input to cause terminal injection, corrupt display, or hide text.
+**Learning:** High-level terminal output libraries often support markup by default. Unsanitized data passed directly to these libraries is susceptible to terminal output injection attacks.
+**Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs before passing them into display functions that evaluate markup.
