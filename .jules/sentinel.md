@@ -46,7 +46,7 @@
 **Learning:** When using deprecated hashing algorithms like MD5 strictly for non-security purposes (like file integrity checks), they must be explicitly flagged to prevent runtime errors on hardened systems.
 **Prevention:** Always use `hashlib.md5(usedforsecurity=False)` when verifying file checksums to ensure compatibility with FIPS mode while maintaining security compliance.
 
-## 2024-06-03 - Prevent Rich Markup Injection (Terminal Output Injection)
-**Vulnerability:** External inputs (such as file paths, album names, filenames) were being formatted directly into `rich` library output strings like `console.print(f"Downloading {filename}")`. If these strings contain `rich` markup tags (like `[bold]`, `[red]`), `rich` would parse and render them, causing terminal formatting issues, hiding text, or potentially causing denial-of-service/crashes by injecting mismatched or invalid tags.
-**Learning:** This is a form of Terminal Output Injection where untrusted input alters the rendering semantics of a terminal UI framework. Any data that is not explicitly controlled by the developer (e.g., from APIs, OS environment, file paths) must be sanitized before being evaluated by `rich`'s markup parser.
-**Prevention:** Always use `rich.markup.escape()` to sanitize any untrusted or variable input before interpolating it into a format string passed to `rich` components (like `console.print()`, `Table.add_row()`, or `Progress.add_task()`).
+## 2025-02-28 - [Terminal Output Injection via Rich library]
+**Vulnerability:** The codebase used the `rich` library (`console.print`, `Table.add_row`, `Progress.add_task`) to display user-controlled inputs (API responses, filenames, album names, exception messages) directly without escaping. Because `rich` supports markup (like `[red]`), an attacker could craft malicious input to cause terminal injection, corrupt display, or hide text.
+**Learning:** High-level terminal output libraries often support markup by default. Unsanitized data passed directly to these libraries is susceptible to terminal output injection attacks.
+**Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs before passing them into display functions that evaluate markup.

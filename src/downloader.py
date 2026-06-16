@@ -19,6 +19,7 @@ from rich.progress import (
     TransferSpeedColumn,
 )
 from rich.table import Table
+from rich.markup import escape
 
 from src.api_client import SmugMugClient, verify_md5
 from src.tracker import DownloadTracker
@@ -125,7 +126,7 @@ def list_albums(client):
 
     nickname = user.get("NickName", "")
     display_name = user.get("Name", nickname)
-    console.print(f"\n[bold]Logged in as:[/bold] {display_name} ({nickname})\n")
+    console.print(f"\n[bold]Logged in as:[/bold] {escape(display_name)} ({escape(nickname)})\n")
 
     with console.status("[bold cyan]Fetching albums..."):
         albums = client.get_user_albums(nickname)
@@ -145,9 +146,9 @@ def list_albums(client):
         table.add_row(
             str(idx),
             escape(album.get("Name", "Unknown")),
-            extract_album_key(album),
-            str(album.get("ImageCount", "?")),
-            album.get("SecurityType", "?"),
+            escape(extract_album_key(album)),
+            escape(str(album.get("ImageCount", "?"))),
+            escape(album.get("SecurityType", "?")),
         )
 
     console.print(table)
@@ -193,7 +194,7 @@ def show_status(output_dir):
             "done": "[green]✓ done[/green]",
             "in_progress": "[yellow]⧗ in progress[/yellow]",
             "pending": "[dim]○ pending[/dim]",
-        }.get(album["status"], album["status"])
+        }.get(album["status"], escape(album["status"]))
 
         table.add_row(
             escape(album["name"]),
@@ -396,7 +397,7 @@ def download_album_images(client, tracker, album, output_dir, album_key, progres
                         failed += 1
                 except Exception as e:
                     failed += 1
-                    progress.console.print(f"[red]Error downloading image: {e}[/red]")
+                    progress.console.print(f"[red]Error downloading image: {escape(str(e))}[/red]")
     except KeyboardInterrupt:
         for future in futures:
             future.cancel()
