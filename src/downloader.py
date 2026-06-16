@@ -194,7 +194,7 @@ def show_status(output_dir):
             "done": "[green]✓ done[/green]",
             "in_progress": "[yellow]⧗ in progress[/yellow]",
             "pending": "[dim]○ pending[/dim]",
-        }.get(album["status"], album["status"])
+        }.get(album["status"], escape(album["status"]))
 
         table.add_row(
             escape(album["name"]),
