@@ -414,7 +414,7 @@ class SmugMugClient:
                     # Verify MD5 if known
                     if expected_md5 and not verify_md5(temp_path, expected_md5):
                         console.print(
-                            f"[yellow]MD5 mismatch: expected {expected_md5}. Retrying...[/yellow]"
+                            f"[yellow]MD5 mismatch: expected {escape(expected_md5)}. Retrying...[/yellow]"
                         )
                         os.remove(temp_path)
                         continue
