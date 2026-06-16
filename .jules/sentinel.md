@@ -46,7 +46,7 @@
 **Learning:** When using deprecated hashing algorithms like MD5 strictly for non-security purposes (like file integrity checks), they must be explicitly flagged to prevent runtime errors on hardened systems.
 **Prevention:** Always use `hashlib.md5(usedforsecurity=False)` when verifying file checksums to ensure compatibility with FIPS mode while maintaining security compliance.
 
-## 2026-05-18 - Rich Markup Injection in Terminal Output
-**Vulnerability:** The application used `rich.console.Console` to print data retrieved from the SmugMug API (such as album names, display names, and nicknames) directly into the terminal without sanitization. If an attacker created an album or account with Rich console markup tags (like `[red]Hacker[/red]`), the tags would be interpreted and rendered by Rich, causing arbitrary text formatting (Terminal Output Injection).
-**Learning:** Terminal output formatting libraries like `rich` interpret embedded tags by default. Any untrusted or external data passed to these functions can alter the terminal output unexpectedly, misleading the user or obfuscating logs.
-**Prevention:** Always sanitize external or user-controlled inputs using `rich.markup.escape()` before passing them to display functions like `console.print()`, `Table.add_row()`, or `Progress.add_task()`.
+## 2025-02-28 - [Terminal Output Injection via Rich library]
+**Vulnerability:** The codebase used the `rich` library (`console.print`, `Table.add_row`, `Progress.add_task`) to display user-controlled inputs (API responses, filenames, album names, exception messages) directly without escaping. Because `rich` supports markup (like `[red]`), an attacker could craft malicious input to cause terminal injection, corrupt display, or hide text.
+**Learning:** High-level terminal output libraries often support markup by default. Unsanitized data passed directly to these libraries is susceptible to terminal output injection attacks.
+**Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs before passing them into display functions that evaluate markup.

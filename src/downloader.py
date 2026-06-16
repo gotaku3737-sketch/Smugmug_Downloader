@@ -7,6 +7,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from rich.console import Console
+from rich.markup import escape
 from rich.progress import (
     BarColumn,
     DownloadColumn,
@@ -146,7 +147,7 @@ def list_albums(client):
             str(idx),
             escape(album.get("Name", "Unknown")),
             escape(extract_album_key(album)),
-            str(album.get("ImageCount", "?")),
+            escape(str(album.get("ImageCount", "?"))),
             escape(album.get("SecurityType", "?")),
         )
 
@@ -396,7 +397,7 @@ def download_album_images(client, tracker, album, output_dir, album_key, progres
                         failed += 1
                 except Exception as e:
                     failed += 1
-                    progress.console.print(f"[red]Error downloading image: {e}[/red]")
+                    progress.console.print(f"[red]Error downloading image: {escape(str(e))}[/red]")
     except KeyboardInterrupt:
         for future in futures:
             future.cancel()
@@ -451,7 +452,7 @@ def run_download(client, output_dir, album_filter=None, workers=DEFAULT_WORKERS)
         ]
         if not albums:
             console.print(
-                f"[yellow]No albums matching '{album_filter}' found.[/yellow]"
+                f"[yellow]No albums matching '{escape(album_filter)}' found.[/yellow]"
             )
             return
 
