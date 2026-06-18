@@ -14,6 +14,7 @@ from requests.models import PreparedRequest
 from rich.console import Console
 from rich.markup import escape
 
+
 from src.config import BASE_URL, API_ROOT, PAGE_SIZE, MAX_RETRIES, RETRY_BACKOFF
 
 console = Console()
@@ -329,13 +330,13 @@ class SmugMugClient:
             parsed_url = urlparse(url)
             hostname = parsed_url.hostname or ""
             if parsed_url.scheme != "https":
-                console.print(f"[red]Security Error: Refusing to download from non-HTTPS URL: {escape(str(url))}[/red]")
+                console.print(f"[red]Security Error: Refusing to download from non-HTTPS URL: {escape(url)}[/red]")
                 return False
             if not (hostname == "smugmug.com" or hostname.endswith(".smugmug.com")):
-                console.print(f"[red]Security Error: Refusing to download from untrusted hostname: {escape(str(hostname))}[/red]")
+                console.print(f"[red]Security Error: Refusing to download from untrusted hostname: {escape(hostname)}[/red]")
                 return False
         except Exception as e:
-            console.print(f"[red]Security Error: Invalid URL format: {escape(str(url))}[/red]")
+            console.print(f"[red]Security Error: Invalid URL format: {escape(url)}[/red]")
             return False
 
 
@@ -372,7 +373,7 @@ class SmugMugClient:
                     redir_host = parsed_redir.hostname or ""
 
                     if parsed_redir.scheme != "https" or not (redir_host == "smugmug.com" or redir_host.endswith(".smugmug.com")):
-                        console.print(f"[red]Security Error: Refusing redirect to untrusted URL: {escape(str(current_url))}[/red]")
+                        console.print(f"[red]Security Error: Refusing redirect to untrusted URL: {escape(current_url)}[/red]")
                         return False
 
                     response = self.session.get(current_url, stream=True, timeout=60, allow_redirects=False)
