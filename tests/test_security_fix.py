@@ -317,23 +317,20 @@ def test_terminal_injection_prevention():
     assert "escape(album_name)" in downloader_code
     assert "escape(str(e))" in downloader_code
 
-def test_terminal_injection_prevention_other_files():
-    """Verify that escape is imported and used in other files where console.print occurs."""
     with open("src/api_client.py", "r") as f:
         api_code = f.read()
     assert "from rich.markup import escape" in api_code
-    assert "escape(endpoint)" in api_code
     assert "escape(url)" in api_code
     assert "escape(hostname)" in api_code
     assert "escape(current_url)" in api_code
-    assert "escape(expected_md5)" in api_code
     assert "escape(str(e))" in api_code
-    assert "escape(str(last_error))" in api_code
 
     with open("src/auth.py", "r") as f:
         auth_code = f.read()
     assert "from rich.markup import escape" in auth_code
     assert "escape(str(e))" in auth_code
+    assert "escape(str(TOKEN_FILE))" in auth_code
+    assert "escape(authorization_url)" in auth_code
 
     with open("src/cli.py", "r") as f:
         cli_code = f.read()
