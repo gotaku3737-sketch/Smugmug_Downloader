@@ -7,6 +7,8 @@ import sys
 mock_rich = MagicMock()
 sys.modules["rich"] = mock_rich
 sys.modules["rich.console"] = mock_rich.console
+sys.modules["rich.markup"] = mock_rich.markup
+sys.modules["rich.markup.escape"] = mock_rich.markup.escape
 sys.modules["requests_oauthlib"] = MagicMock()
 
 import src.config
