@@ -9,6 +9,8 @@ sys.modules["rich"] = mock_rich
 sys.modules["rich.console"] = mock_rich.console
 sys.modules["rich.markup"] = mock_rich.markup
 sys.modules["rich.markup.escape"] = mock_rich.markup.escape
+sys.modules["rich.progress"] = mock_rich.progress
+sys.modules["rich.table"] = mock_rich.table
 sys.modules["requests_oauthlib"] = MagicMock()
 # Mock requests to avoid ModuleNotFoundError since its not available during this test run without doing pip install
 sys.modules["requests"] = MagicMock()
@@ -305,7 +307,6 @@ def test_verify_md5_usedforsecurity_false():
 def test_terminal_injection_prevention():
     import sys
     from unittest.mock import patch, MagicMock
-
     # Instead of importing src.downloader directly, we use sys.modules manipulation to bypass the global rich mock temporarily.
     # We will just verify that 'rich.markup.escape' is actually imported and used by reading the file.
     # Then we test the actual logic in isolation without importing src.downloader fully or by unmocking rich completely.
@@ -343,3 +344,36 @@ def test_terminal_injection_prevention():
     assert "from rich.markup import escape" in cli_code
     assert "escape(os.path.abspath(default))" in cli_code
     assert "escape(os.path.abspath(output_dir))" in cli_code
+    assert "escape(str(e))" in cli_code
+
+
+
+def test_cli_prevents_stack_trace_leakage():
+    import sys
+    from unittest.mock import patch, MagicMock
+    from src.cli import main
+
+    # We patch get_api_credentials to raise a generic unhandled Exception with a mocked payload.
+    with patch("src.cli.get_api_credentials", side_effect=Exception("Unhandled test exception! [red]attack[/red]")), \
+         patch("src.cli.console.print") as mock_print, \
+         patch("sys.exit") as mock_exit, \
+         patch("src.cli.escape", side_effect=lambda x: x.replace("[", r"\[").replace("]", r"\]")) as mock_escape, \
+         patch("src.cli.argparse.ArgumentParser.parse_args", return_value=MagicMock(status=False, reset=False)):
+
+        main()
+
+        # Verify sys.exit(1) was called
+        mock_exit.assert_called_once_with(1)
+
+        # Check that the exception was printed and escaped correctly
+        print_calls = mock_print.call_args_list
+        found_escaped_error = False
+        for call in print_calls:
+            msg = call[0][0]
+            if "Unhandled test exception" in msg:
+                # Expecting that the text has been escaped
+                if r"\[red\]attack\[/red\]" in msg:
+                    found_escaped_error = True
+                    break
+
+        assert found_escaped_error, "The exception message was not properly escaped or printed."
