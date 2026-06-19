@@ -2,11 +2,12 @@
 CLI entry point for SmugMug Downloader.
 """
 
+import sys
 import argparse
 import os
-import sys
 
 from rich.console import Console
+from rich.markup import escape
 
 from src import __version__
 from src.config import DEFAULT_OUTPUT_DIR, get_api_credentials, DEFAULT_WORKERS
@@ -40,7 +41,7 @@ def prompt_output_dir(default):
     """
     console.print(
         f"[bold]Where should downloads be saved?[/bold] "
-        f"[dim](default: {os.path.abspath(default)})[/dim]"
+        f"[dim](default: {escape(os.path.abspath(default))})[/dim]"
     )
     user_input = console.input("  [bold]Output directory: [/bold]").strip()
 
@@ -139,7 +140,7 @@ def main():
 
     console.print(
         f"\n[dim]Downloads will be saved to: "
-        f"{os.path.abspath(output_dir)}[/dim]\n"
+        f"{escape(os.path.abspath(output_dir))}[/dim]\n"
     )
 
     # Run the download
@@ -153,6 +154,9 @@ def main():
             "[dim]Run the same command again to resume.[/dim]"
         )
         sys.exit(0)
+    except Exception as e:
+        console.print(f"\n[bold red]An unexpected error occurred: {escape(str(e))}[/bold red]")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

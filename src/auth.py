@@ -55,7 +55,7 @@ def save_tokens(tokens):
         with os.fdopen(fd, "w") as f:
             json.dump(tokens, f, indent=2)
         console.print(
-            f"[dim]Tokens saved to {TOKEN_FILE}[/dim]"
+            f"[dim]Tokens saved to {escape(str(TOKEN_FILE))}[/dim]"
         )
     except OSError as e:
         console.print(f"[yellow]Warning: Could not save tokens: {escape(str(e))}[/yellow]")

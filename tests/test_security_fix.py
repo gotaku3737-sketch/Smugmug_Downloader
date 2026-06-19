@@ -10,6 +10,10 @@ sys.modules["rich.console"] = mock_rich.console
 sys.modules["rich.markup"] = mock_rich.markup
 sys.modules["rich.markup.escape"] = mock_rich.markup.escape
 sys.modules["requests_oauthlib"] = MagicMock()
+# Mock requests to avoid ModuleNotFoundError since its not available during this test run without doing pip install
+sys.modules["requests"] = MagicMock()
+sys.modules["requests.models"] = MagicMock()
+sys.modules["requests.models.PreparedRequest"] = MagicMock()
 
 import src.config
 import src.auth
@@ -316,19 +320,26 @@ def test_terminal_injection_prevention():
     assert "escape(filename)" in downloader_code
     assert "escape(album_name)" in downloader_code
     assert "escape(str(e))" in downloader_code
+    assert "escape(os.path.abspath(output_dir))" in downloader_code
 
     with open("src/api_client.py", "r") as f:
-        api_client_code = f.read()
-
-    assert "from rich.markup import escape" in api_client_code
-    assert "escape(url)" in api_client_code
-    assert "escape(hostname)" in api_client_code
-    assert "escape(current_url)" in api_client_code
-    assert "escape(str(e))" in api_client_code
+        api_code = f.read()
+    assert "from rich.markup import escape" in api_code
+    assert "escape(url)" in api_code
+    assert "escape(hostname)" in api_code
+    assert "escape(current_url)" in api_code
+    assert "escape(str(e))" in api_code
+    assert "escape(expected_md5)" in api_code
 
     with open("src/auth.py", "r") as f:
         auth_code = f.read()
-
     assert "from rich.markup import escape" in auth_code
     assert "escape(str(e))" in auth_code
+    assert "escape(str(TOKEN_FILE))" in auth_code
     assert "escape(authorization_url)" in auth_code
+
+    with open("src/cli.py", "r") as f:
+        cli_code = f.read()
+    assert "from rich.markup import escape" in cli_code
+    assert "escape(os.path.abspath(default))" in cli_code
+    assert "escape(os.path.abspath(output_dir))" in cli_code
