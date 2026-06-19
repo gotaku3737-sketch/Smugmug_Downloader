@@ -7,13 +7,8 @@ import sys
 mock_rich = MagicMock()
 sys.modules["rich"] = mock_rich
 sys.modules["rich.console"] = mock_rich.console
-# Fix missing rich.markup module mock
-mock_rich.markup = MagicMock()
-mock_rich.markup.escape = MagicMock(side_effect=lambda x: str(x))
-
-mock_rich.markup.escape = MagicMock(side_effect=lambda x: x)
 sys.modules["rich.markup"] = mock_rich.markup
-
+sys.modules["rich.markup.escape"] = mock_rich.markup.escape
 sys.modules["requests_oauthlib"] = MagicMock()
 # Mock requests to avoid ModuleNotFoundError since its not available during this test run without doing pip install
 sys.modules["requests"] = MagicMock()

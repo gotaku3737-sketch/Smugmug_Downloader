@@ -2,9 +2,9 @@
 CLI entry point for SmugMug Downloader.
 """
 
+import sys
 import argparse
 import os
-import sys
 
 from rich.console import Console
 from rich.markup import escape
