@@ -304,6 +304,7 @@ def test_verify_md5_usedforsecurity_false():
     finally:
         os.remove(filepath)
 
+
 def test_terminal_injection_prevention():
     import sys
     from unittest.mock import patch, MagicMock
@@ -311,8 +312,8 @@ def test_terminal_injection_prevention():
     # We will just verify that 'rich.markup.escape' is actually imported and used by reading the file.
     # Then we test the actual logic in isolation without importing src.downloader fully or by unmocking rich completely.
 
-    with open("src/downloader.py", "r") as f:
-        downloader_code = f.read()
+        # Call something that prints
+        client.download_file("http://api.smugmug.com/image.jpg", "/tmp/out")
 
     assert "from rich.markup import escape" in downloader_code
     assert "escape(display_name)" in downloader_code
