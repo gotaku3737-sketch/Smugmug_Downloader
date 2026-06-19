@@ -50,3 +50,13 @@
 **Vulnerability:** The codebase used the `rich` library (`console.print`, `Table.add_row`, `Progress.add_task`) to display user-controlled inputs (API responses, filenames, album names, exception messages) directly without escaping. Because `rich` supports markup (like `[red]`), an attacker could craft malicious input to cause terminal injection, corrupt display, or hide text.
 **Learning:** High-level terminal output libraries often support markup by default. Unsanitized data passed directly to these libraries is susceptible to terminal output injection attacks.
 **Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs before passing them into display functions that evaluate markup.
+
+## 2026-05-28 - Terminal Output Injection via Rich library Extention
+**Vulnerability:** The codebase had previously fixed Terminal Output Injection in `src/downloader.py` but failed to sanitize user-controlled inputs in `src/api_client.py`, `src/auth.py`, and `src/cli.py` printed via `console.print`. Inputs like URLs, exception messages, and file paths could potentially contain markup (like `[red]`), leading to terminal injection.
+**Learning:** Terminal Output Injection fixes must be applied universally across the entire codebase wherever unsanitized user-controlled data is passed to display functions that evaluate markup.
+**Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs before passing them into display functions that evaluate markup across all modules in the application.
+
+## 2024-05-28 - Stack Trace Information Leakage in CLI
+**Vulnerability:** The command-line interface entrypoint in `src/cli.py` lacked a global, catch-all exception handler. Consequently, any unhandled exception occurring during the application's lifecycle would cause Python to crash and print a full stack trace to standard error. This stack trace could expose sensitive internal details, file paths, logic structures, and variable states to an attacker or unprivileged user.
+**Learning:** CLI applications should act as a robust boundary and handle generic exceptions cleanly. Relying on the default interpreter behavior for error states in production software leads to unnecessary information leakage.
+**Prevention:** Implement a global `try...except Exception as e:` block around the main execution logic in CLI entry points. Ensure that generic errors are caught, a safe, sanitized (escaped) error message is presented to the user, and the program exits gracefully with a non-zero status code (e.g., `sys.exit(1)`).

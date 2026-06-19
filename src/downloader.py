@@ -194,7 +194,7 @@ def show_status(output_dir):
             "done": "[green]✓ done[/green]",
             "in_progress": "[yellow]⧗ in progress[/yellow]",
             "pending": "[dim]○ pending[/dim]",
-        }.get(album["status"], album["status"])
+        }.get(album["status"], escape(album["status"]))
 
         table.add_row(
             escape(album["name"]),
@@ -457,7 +457,7 @@ def run_download(client, output_dir, album_filter=None, workers=DEFAULT_WORKERS)
             return
 
     console.print(f"[bold]Found {len(albums)} album(s) to process.[/bold]")
-    console.print(f"[dim]Output directory: {os.path.abspath(output_dir)}[/dim]\n")
+    console.print(f"[dim]Output directory: {escape(os.path.abspath(output_dir))}[/dim]\n")
 
     total_downloaded = 0
     total_skipped = 0
@@ -521,5 +521,5 @@ def run_download(client, output_dir, album_filter=None, workers=DEFAULT_WORKERS)
     console.print(f"  [dim]Skipped:[/dim]    {total_skipped}")
     if total_failed:
         console.print(f"  [red]Failed:[/red]     {total_failed}")
-    console.print(f"  [dim]Location:[/dim]   {os.path.abspath(output_dir)}")
+    console.print(f"  [dim]Location:[/dim]   {escape(os.path.abspath(output_dir))}")
     console.print("─" * 50)
