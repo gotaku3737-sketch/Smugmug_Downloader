@@ -2,9 +2,9 @@
 CLI entry point for SmugMug Downloader.
 """
 
+import sys
 import argparse
 import os
-import sys
 
 from rich.console import Console
 from rich.markup import escape
@@ -154,6 +154,9 @@ def main():
             "[dim]Run the same command again to resume.[/dim]"
         )
         sys.exit(0)
+    except Exception as e:
+        console.print(f"\n[bold red]An unexpected error occurred: {escape(str(e))}[/bold red]")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

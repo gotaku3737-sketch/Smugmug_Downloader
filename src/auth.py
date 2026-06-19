@@ -55,7 +55,7 @@ def save_tokens(tokens):
         with os.fdopen(fd, "w") as f:
             json.dump(tokens, f, indent=2)
         console.print(
-            f"[dim]Tokens saved to {escape(TOKEN_FILE)}[/dim]"
+            f"[dim]Tokens saved to {escape(str(TOKEN_FILE))}[/dim]"
         )
     except OSError as e:
         console.print(f"[yellow]Warning: Could not save tokens: {escape(str(e))}[/yellow]")
@@ -92,7 +92,7 @@ def authorize(api_key, api_secret):
     console.print(
         "\n[bold]Please visit this URL in your browser to authorize the app:[/bold]"
     )
-    console.print(f"[link={authorization_url}]{authorization_url}[/link]\n")
+    console.print(f"[link={escape(authorization_url)}]{escape(authorization_url)}[/link]\n")
 
     # Step 3: User enters verification code
     verifier = console.input(

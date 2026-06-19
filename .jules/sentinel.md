@@ -50,7 +50,8 @@
 **Vulnerability:** The codebase used the `rich` library (`console.print`, `Table.add_row`, `Progress.add_task`) to display user-controlled inputs (API responses, filenames, album names, exception messages) directly without escaping. Because `rich` supports markup (like `[red]`), an attacker could craft malicious input to cause terminal injection, corrupt display, or hide text.
 **Learning:** High-level terminal output libraries often support markup by default. Unsanitized data passed directly to these libraries is susceptible to terminal output injection attacks.
 **Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs before passing them into display functions that evaluate markup.
-## 2025-02-28 - [Terminal Output Injection via Rich library]
-**Vulnerability:** The codebase used the `rich` library (`console.print`) to display user-controlled or external inputs (API responses, URLs, hostnames, exception messages, paths) directly without escaping in `src/api_client.py`, `src/auth.py`, and `src/cli.py`. Because `rich` supports markup (like `[red]`), an attacker could craft malicious input to cause terminal injection, corrupt display, or hide text.
-**Learning:** High-level terminal output libraries often support markup by default. Unsanitized data passed directly to these libraries is susceptible to terminal output injection attacks.
-**Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs before passing them into display functions that evaluate markup.
+
+## 2026-05-28 - Terminal Output Injection via Rich library Extention
+**Vulnerability:** The codebase had previously fixed Terminal Output Injection in `src/downloader.py` but failed to sanitize user-controlled inputs in `src/api_client.py`, `src/auth.py`, and `src/cli.py` printed via `console.print`. Inputs like URLs, exception messages, and file paths could potentially contain markup (like `[red]`), leading to terminal injection.
+**Learning:** Terminal Output Injection fixes must be applied universally across the entire codebase wherever unsanitized user-controlled data is passed to display functions that evaluate markup.
+**Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs before passing them into display functions that evaluate markup across all modules in the application.
