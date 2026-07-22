@@ -312,17 +312,15 @@ def test_terminal_injection_prevention():
     # We will just verify that 'rich.markup.escape' is actually imported and used by reading the file.
     # Then we test the actual logic in isolation without importing src.downloader fully or by unmocking rich completely.
 
-        # Call something that prints
-        client.download_file("http://api.smugmug.com/image.jpg", "/tmp/out")
 
-    assert "from rich.markup import escape" in downloader_code
-    assert "escape(display_name)" in downloader_code
-    assert "escape(album.get(\"Name\", \"Unknown\"))" in downloader_code
-    assert "escape(album[\"name\"])" in downloader_code
-    assert "escape(filename)" in downloader_code
-    assert "escape(album_name)" in downloader_code
-    assert "escape(str(e))" in downloader_code
-    assert "escape(os.path.abspath(output_dir))" in downloader_code
+    assert "from rich.markup import escape" in open("src/downloader.py").read()
+    assert "escape(display_name)" in open("src/downloader.py").read()
+    assert "escape(album.get(\"Name\", \"Unknown\"))" in open("src/downloader.py").read()
+    assert "escape(album[\"name\"])" in open("src/downloader.py").read()
+    assert "escape(filename)" in open("src/downloader.py").read()
+    assert "escape(album_name)" in open("src/downloader.py").read()
+    assert "escape(str(e))" in open("src/downloader.py").read()
+    assert "escape(os.path.abspath(output_dir))" in open("src/downloader.py").read()
 
     with open("src/api_client.py", "r") as f:
         api_code = f.read()
