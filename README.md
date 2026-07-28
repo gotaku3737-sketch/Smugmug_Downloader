@@ -4,50 +4,55 @@ A Python CLI tool to download **all galleries (albums)** from a SmugMug account 
 
 ## Features
 
-- **Parallel downloads** — utilizes concurrent thread workers for high-speed file transfers.
+- **Parallel downloads** — utilizes concurrent thread workers (`-w` / `--workers`) for high-speed file transfers.
 - **Integrity verification** — automatically validates downloaded files using MD5 checksums (with self-healing retries on mismatches).
-- **Advanced global progress** — displays real-time backup metrics, including overall transfer speed (MB/s), total backup size, aggregate ETA, and transient sub-task download bars.
-- **OAuth 1.0a authentication** — one-time browser-based authorization, tokens cached for future runs.
-- **Full account download** — discovers and downloads every album tied to the account.
-- **Resume support** — tracks per-image download state in a JSON file; interrupted downloads resume where they left off.
-- **Retry with backoff** — automatically retries on rate limits, server errors, and connection failures.
-- **Original quality** — downloads the archived (full-resolution) version of each photo/video.
+- **Advanced global progress** — displays real-time backup metrics via `rich`, including overall transfer speed (MB/s), total backup size, aggregate ETA, and transient sub-task download bars.
+- **OAuth 1.0a authentication** — one-time browser-based authorization; OAuth access tokens are cached in `.smugmug_tokens.json` for future runs.
+- **Full account download** — discovers and downloads every album tied to the user's account.
+- **Album filtering** — download specific albums by name matching (`-a` / `--album`).
+- **Resume support** — tracks per-image download state in a JSON file (`.smugmug_download_state.json`); interrupted downloads resume seamlessly.
+- **Retry with exponential backoff** — automatically retries on rate limits (HTTP 429), server errors (HTTP 500/503), and connection failures.
+- **Original quality** — downloads full-resolution archived photos and videos.
+- **Terminal Injection & Path Security** — output formatting escapes Rich markup tags to prevent terminal injection, and file/folder paths are sanitized against path traversal vulnerabilities.
 
-## Project Structure
+## Project Architecture & Specs
+
+The project uses Behavior-Driven Development (BDD) with Gherkin feature files stored in `features/` and implemented via `pytest-bdd`.
 
 ```
 Smugmug_Downloader/
-├── main.py                          # Entry point
-├── requirements.txt                 # Python dependencies
-├── setup.py                         # Package installation script
+├── main.py                          # Top-level executable script entry point
+├── requirements.txt                 # Python runtime and testing dependencies
+├── setup.py                         # Package installation script (defines `smd` and `smugmug-download`)
+├── pyproject.toml                   # Project metadata and setuptools configuration
 ├── .env.example                     # API credential template
-├── features/                        # Gherkin BDD specifications
-│   ├── api_resilience.feature
-│   ├── authentication.feature
-│   ├── cli_workflows.feature
-│   ├── concurrency.feature
-│   ├── download_tracking.feature
-│   └── integrity.feature
-├── src/
-│   ├── __init__.py
-│   ├── config.py                    # Settings & credential resolution
-│   ├── auth.py                      # OAuth 1.0a flow with token caching
-│   ├── api_client.py                # SmugMug API wrapper (pagination, retry)
-│   ├── tracker.py                   # JSON-based download state tracker
-│   ├── downloader.py                # Download orchestration engine
-│   └── cli.py                       # CLI interface (argparse + rich)
-└── tests/
-    ├── step_defs/                   # BDD step definitions
+├── features/                        # Gherkin BDD Feature Specification Files
+│   ├── api_resilience.feature       # Backoff retries for HTTP 429/500/503 errors
+│   ├── authentication.feature       # OAuth 1.0a flow, token caching, credential resolution
+│   ├── cli_workflows.feature        # Listing, album filtering, status, and reset flags
+│   ├── concurrency.feature          # Parallel thread worker scaling
+│   ├── download_tracking.feature    # Persistent state tracking and resume capabilities
+│   └── integrity.feature            # MD5 checksum verification and corruption self-healing
+├── src/                             # Core Python implementation package
+│   ├── __init__.py                  # Version declaration (v1.0.0)
+│   ├── config.py                    # Credential resolution (Env vars > Static constants > CLI prompt)
+│   ├── auth.py                      # OAuth 1.0a authentication & token persistence
+│   ├── api_client.py                # SmugMug API wrapper (pagination, backoff, download stream)
+│   ├── tracker.py                   # JSON state tracking engine (.smugmug_download_state.json)
+│   ├── downloader.py                # Concurrent download engine and progress reporting
+│   └── cli.py                       # Command line interface parsing & command dispatch
+└── tests/                           # Test suite
+    ├── step_defs/                   # BDD step definition files for pytest-bdd
     │   ├── test_api_steps.py
     │   ├── test_authentication_steps.py
     │   ├── test_cli_steps.py
     │   ├── test_concurrency_steps.py
     │   ├── test_integrity_steps.py
     │   └── test_tracking_steps.py
-    ├── test_tracker.py              # Unit tests for state tracker
-    ├── test_api_client.py           # Unit tests for API client
-    ├── test_downloader.py           # Unit tests for downloader logic
-    └── test_security_fix.py         # Unit tests for security fixes
+    ├── test_tracker.py              # Unit tests for DownloadTracker
+    ├── test_api_client.py           # Unit tests for SmugMugClient
+    ├── test_downloader.py           # Unit tests for download orchestration
+    └── test_security_fix.py         # Unit tests for terminal injection and security fixes
 ```
 
 ## Setup
@@ -58,9 +63,9 @@ Smugmug_Downloader/
 pip3 install -e .
 ```
 
-This installs the project locally and makes the `smd` command available in your terminal.
+This installs the project locally and makes the `smd` and `smugmug-download` commands available in your terminal.
 
-To uninstall the tool and remove the `smd` command later, simply run:
+To uninstall the tool later, run:
 ```bash
 pip3 uninstall smugmug-downloader
 ```
@@ -74,8 +79,8 @@ Set your credentials via **one of** these methods:
 | Method | How |
 |---|---|
 | **Environment variables** | `export SMUGMUG_API_KEY=... SMUGMUG_API_SECRET=...` |
-| **Static constants** | Edit `API_KEY` and `API_SECRET` at the top of `src/config.py` |
-| **Interactive prompt** | Just run the app — it will ask you |
+| **Static constants** | Edit `API_KEY` and `API_SECRET` in `src/config.py` |
+| **Interactive prompt** | Run the application — it will prompt for missing keys |
 
 ## Usage
 
@@ -83,17 +88,19 @@ Set your credentials via **one of** these methods:
 
 ```bash
 smd
+# or
+smugmug-download
 ```
 
 On first run, the app will:
-1. Prompt for API credentials (if not already set)
-2. Ask where to save downloads (default: `./smugmug_downloads`)
-3. Walk you through OAuth authorization in your browser
-4. Begin downloading all albums
+1. Prompt for API credentials (if not already configured)
+2. Prompt for destination folder (default: `./smugmug_downloads`)
+3. Open a browser window to authorize access via OAuth 1.0a
+4. Save access tokens to `.smugmug_tokens.json` and start downloading all albums
 
 ### Specifying concurrent workers
 
-To speed up downloads, specify the maximum number of concurrent workers (default: 3):
+To speed up downloads, adjust the worker thread count (default: 3):
 ```bash
 smd -w 5
 ```
@@ -116,13 +123,13 @@ smd -a "Vacation 2024"
 smd --list-albums
 ```
 
-### Check download progress
+### Check download progress (No API Auth Required)
 
 ```bash
 smd --status -o ~/SmugMug_Backup
 ```
 
-### Reset tracking state and start fresh
+### Reset tracking state (No API Auth Required)
 
 ```bash
 smd --reset -o ~/SmugMug_Backup
@@ -130,20 +137,26 @@ smd --reset -o ~/SmugMug_Backup
 
 ### Resume an interrupted download
 
-Simply re-run the same command — already-downloaded files are automatically skipped:
+Simply re-run your download command — already-downloaded and verified files are automatically skipped:
 
 ```bash
 smd -o ~/SmugMug_Backup
 ```
 
-## Running Tests
+## Testing & Specifications
+
+The test suite covers unit tests and BDD feature specification scenarios.
+
+### Running all tests
 
 ```bash
-pip3 install -r requirements.txt
+pip3 install -e ".[dev]"
 python3 -m pytest tests/ -v
 ```
 
-To run only the BDD tests:
+### Running BDD specification tests
+
+To run only the BDD feature tests in `features/`:
 
 ```bash
 python3 -m pytest tests/step_defs/ -v

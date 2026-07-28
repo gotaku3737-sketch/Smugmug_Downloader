@@ -143,7 +143,7 @@ def main():
             f"\n[dim]Downloads will be saved to: "
             f"{escape(os.path.abspath(output_dir))}[/dim]\n"
         )
-        sys.exit(0)
+        run_download(client, output_dir, album_filter=args.album, workers=args.workers)
     except Exception as e:
         console.print(f"\n[bold red]An unexpected error occurred: {escape(str(e))}[/bold red]")
         sys.exit(1)
