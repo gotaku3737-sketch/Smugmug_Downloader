@@ -8,7 +8,7 @@ import hashlib
 import time
 
 
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, quote
 from requests.models import PreparedRequest
 
 from rich.console import Console
@@ -238,7 +238,8 @@ class SmugMugClient:
         Returns:
             list: List of album objects.
         """
-        endpoint = f"{API_ROOT}/user/{nickname}!albums"
+        encoded_nickname = quote(nickname, safe="")
+        endpoint = f"{API_ROOT}/user/{encoded_nickname}!albums"
         return list(self._paginate(endpoint, response_key="Album"))
 
     def get_album_images(self, album_key):
@@ -250,7 +251,8 @@ class SmugMugClient:
         Returns:
             list: List of image objects.
         """
-        endpoint = f"{API_ROOT}/album/{album_key}!images"
+        encoded_album_key = quote(album_key, safe="")
+        endpoint = f"{API_ROOT}/album/{encoded_album_key}!images"
         return list(self._paginate(endpoint, response_key="AlbumImage"))
 
     def get_image_download_url(self, image_key):
@@ -262,7 +264,8 @@ class SmugMugClient:
         Returns:
             str: The download URL, or None if not found.
         """
-        endpoint = f"{API_ROOT}/image/{image_key}!sizedetails"
+        encoded_image_key = quote(image_key, safe="")
+        endpoint = f"{API_ROOT}/image/{encoded_image_key}!sizedetails"
         try:
             data = self._request("GET", endpoint)
             response = data.get("Response", {})
@@ -298,7 +301,8 @@ class SmugMugClient:
         Returns:
             dict: Image metadata.
         """
-        endpoint = f"{API_ROOT}/image/{image_key}"
+        encoded_image_key = quote(image_key, safe="")
+        endpoint = f"{API_ROOT}/image/{encoded_image_key}"
         data = self._request("GET", endpoint)
         return data.get("Response", {}).get("Image", {})
 
