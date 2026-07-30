@@ -378,3 +378,28 @@ def test_cli_prevents_stack_trace_leakage():
                     break
 
         assert found_escaped_error, "The exception message was not properly escaped or printed."
+
+def test_api_client_prevents_endpoint_injection():
+    from src.api_client import SmugMugClient
+    from unittest.mock import MagicMock
+    import pytest
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # We mock _paginate so we don't actually make requests but can inspect the endpoint called
+    client._paginate = MagicMock(return_value=[])
+
+    # Test path traversal payload in nickname
+    attack_nickname = "../attacker"
+    client.get_user_albums(attack_nickname)
+
+    # Verify the endpoint was properly URL encoded
+    # ..%2Fattacker instead of ../attacker (Python quote doesn't encode dots by default unless we do something else, but it encodes /)
+    client._paginate.assert_called_once()
+    args, kwargs = client._paginate.call_args
+    called_endpoint = args[0]
+
+    # It should be /api/v2/user/..%2Fattacker!albums
+    assert "..%2Fattacker" in called_endpoint
+    assert "../attacker" not in called_endpoint
