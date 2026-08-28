@@ -312,15 +312,17 @@ def test_terminal_injection_prevention():
     # We will just verify that 'rich.markup.escape' is actually imported and used by reading the file.
     # Then we test the actual logic in isolation without importing src.downloader fully or by unmocking rich completely.
 
+    with open("src/downloader.py", "r") as f:
+        downloader_code = f.read()
 
-    assert "from rich.markup import escape" in open("src/downloader.py").read()
-    assert "escape(display_name)" in open("src/downloader.py").read()
-    assert "escape(album.get(\"Name\", \"Unknown\"))" in open("src/downloader.py").read()
-    assert "escape(album[\"name\"])" in open("src/downloader.py").read()
-    assert "escape(filename)" in open("src/downloader.py").read()
-    assert "escape(album_name)" in open("src/downloader.py").read()
-    assert "escape(str(e))" in open("src/downloader.py").read()
-    assert "escape(os.path.abspath(output_dir))" in open("src/downloader.py").read()
+    assert "from rich.markup import escape" in downloader_code
+    assert "escape(display_name)" in downloader_code
+    assert "escape(album.get(\"Name\", \"Unknown\"))" in downloader_code
+    assert "escape(album[\"name\"])" in downloader_code
+    assert "escape(filename)" in downloader_code
+    assert "escape(album_name)" in downloader_code
+    assert "escape(str(e))" in downloader_code
+    assert "escape(os.path.abspath(output_dir))" in downloader_code
 
     with open("src/api_client.py", "r") as f:
         api_code = f.read()
@@ -376,3 +378,28 @@ def test_cli_prevents_stack_trace_leakage():
                     break
 
         assert found_escaped_error, "The exception message was not properly escaped or printed."
+
+def test_api_client_prevents_endpoint_injection():
+    from src.api_client import SmugMugClient
+    from unittest.mock import MagicMock
+    import pytest
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # We mock _paginate so we don't actually make requests but can inspect the endpoint called
+    client._paginate = MagicMock(return_value=[])
+
+    # Test path traversal payload in nickname
+    attack_nickname = "../attacker"
+    client.get_user_albums(attack_nickname)
+
+    # Verify the endpoint was properly URL encoded
+    # ..%2Fattacker instead of ../attacker (Python quote doesn't encode dots by default unless we do something else, but it encodes /)
+    client._paginate.assert_called_once()
+    args, kwargs = client._paginate.call_args
+    called_endpoint = args[0]
+
+    # It should be /api/v2/user/..%2Fattacker!albums
+    assert "..%2Fattacker" in called_endpoint
+    assert "../attacker" not in called_endpoint

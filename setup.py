@@ -26,6 +26,7 @@ setup(
     entry_points={
         "console_scripts": [
             "smd=src.cli:main",
+            "smugmug-download=src.cli:main",
         ],
     },
     description="A Python CLI tool to download all galleries (albums) from a SmugMug account.",
