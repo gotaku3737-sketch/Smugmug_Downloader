@@ -13,7 +13,7 @@ A Python CLI tool to download **all galleries (albums)** from a SmugMug account 
 - **Resume support** — tracks per-image download state in a JSON file (`.smugmug_download_state.json`); interrupted downloads resume seamlessly.
 - **Retry with exponential backoff** — automatically retries on rate limits (HTTP 429), server errors (HTTP 500/503), and connection failures.
 - **Original quality** — downloads full-resolution archived photos and videos.
-- **Terminal Injection & Path Security** — output formatting escapes Rich markup tags to prevent terminal injection, and file/folder paths are sanitized against path traversal vulnerabilities.
+- **Hardened Security & Path Traversal Protection** — protects against API parameter and file path traversal, SSRF via endpoint and redirect validation, terminal injection via Rich tag escaping, stack trace/credential leakage, and enforces secure token file permissions.
 
 ## Project Architecture & Specs
 
