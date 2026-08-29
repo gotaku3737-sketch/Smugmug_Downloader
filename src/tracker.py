@@ -31,12 +31,11 @@ class DownloadTracker:
         Returns:
             dict: The current download state.
         """
-        if os.path.exists(self.state_file):
-            try:
-                with open(self.state_file, "r") as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, IOError):
-                pass
+        try:
+            with open(self.state_file, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError, IOError):
+            pass
 
         return {"albums": {}, "last_updated": None}
 
@@ -56,8 +55,10 @@ class DownloadTracker:
                 os.replace(temp_path, self.state_file)
             except Exception:
                 # Clean up temp file on failure
-                if os.path.exists(temp_path):
+                try:
                     os.remove(temp_path)
+                except OSError:
+                    pass
                 raise
 
     # --- Album-level tracking ---

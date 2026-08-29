@@ -403,3 +403,51 @@ def test_api_client_prevents_endpoint_injection():
     # It should be /api/v2/user/..%2Fattacker!albums
     assert "..%2Fattacker" in called_endpoint
     assert "../attacker" not in called_endpoint
+
+def test_auth_verifier_validation():
+    from src.auth import authorize
+    from unittest.mock import patch, MagicMock
+    import pytest
+
+    with patch("src.auth.console") as mock_console:
+        with patch("src.auth.OAuth1Session") as MockOAuth:
+            mock_oauth_inst = MockOAuth.return_value
+            mock_oauth_inst.fetch_request_token.return_value = {
+                "oauth_token": "rt", "oauth_token_secret": "rts"
+            }
+            mock_oauth_inst.authorization_url.return_value = "http://auth"
+
+            # Test empty verifier
+            mock_console.input.return_value = ""
+            with pytest.raises(SystemExit):
+                authorize("key", "secret")
+
+            # Test short verifier
+            mock_console.input.return_value = "12345"
+            with pytest.raises(SystemExit):
+                authorize("key", "secret")
+
+            # Test non-digit verifier
+            mock_console.input.return_value = "12345a"
+            with pytest.raises(SystemExit):
+                authorize("key", "secret")
+
+            # Test valid verifier
+            mock_console.input.return_value = "123456"
+            mock_oauth_inst.fetch_access_token.return_value = {
+                "oauth_token": "at", "oauth_token_secret": "ats"
+            }
+            with patch("src.auth.save_tokens"):
+                authorize("key", "secret")
+
+def test_tracker_load_state_toctou():
+    from src.tracker import DownloadTracker
+    import json
+
+    # We create a fake state path that doesn't exist
+    tracker = DownloadTracker("/tmp/non_existent_state_file.json")
+
+    # Since we removed os.path.exists and just catch FileNotFoundError/OSError
+    # _load_state should securely handle this and return default state
+    state = tracker._load_state()
+    assert state == {"albums": {}, "last_updated": None}

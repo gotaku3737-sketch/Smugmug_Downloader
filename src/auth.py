@@ -33,14 +33,13 @@ def load_cached_tokens():
         dict or None: Token dict with 'oauth_token' and 'oauth_token_secret',
                       or None if no cached tokens exist.
     """
-    if os.path.exists(TOKEN_FILE):
-        try:
-            with open(TOKEN_FILE, "r") as f:
-                tokens = json.load(f)
-            if tokens.get("oauth_token") and tokens.get("oauth_token_secret"):
-                return tokens
-        except (json.JSONDecodeError, IOError):
-            pass
+    try:
+        with open(TOKEN_FILE, "r") as f:
+            tokens = json.load(f)
+        if tokens.get("oauth_token") and tokens.get("oauth_token_secret"):
+            return tokens
+    except (json.JSONDecodeError, OSError, IOError):
+        pass
     return None
 
 
@@ -99,8 +98,8 @@ def authorize(api_key, api_secret):
         "[bold]Enter the 6-digit verification code: [/bold]", password=True
     ).strip()
 
-    if not verifier:
-        console.print("[bold red]No verification code entered. Exiting.[/bold red]")
+    if not verifier or not verifier.isdigit() or len(verifier) != 6:
+        console.print("[bold red]Invalid verification code. Must be exactly 6 digits. Exiting.[/bold red]")
         raise SystemExit(1)
 
     # Step 4: Exchange for access token

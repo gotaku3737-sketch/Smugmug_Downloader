@@ -428,8 +428,10 @@ class SmugMugClient:
                     return True
                 except Exception:
                     # Clean up temp file on internal failure if not already cleaned
-                    if os.path.exists(temp_path):
+                    try:
                         os.remove(temp_path)
+                    except OSError:
+                        pass
                     raise
 
             except Exception as e:
