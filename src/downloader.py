@@ -269,8 +269,8 @@ def download_image_worker(client, tracker, image, album_key, album_dir, progress
     tracker.register_image(album_key, image_key, filename)
     tracker.set_image_status(album_key, image_key, "in_progress")
 
-    # 2. Check if file already exists on disk
-    if os.path.exists(dest_path):
+    # 2. Check if file already exists on disk securely using EAFP to avoid TOCTOU
+    try:
         if expected_md5:
             if verify_md5(dest_path, expected_md5):
                 tracker.set_image_status(album_key, image_key, "done")
@@ -279,17 +279,22 @@ def download_image_worker(client, tracker, image, album_key, album_dir, progress
                 return "skipped"
         else:
             expected_size = image.get("ArchivedSize")
-            if expected_size and os.path.getsize(dest_path) == expected_size:
+            if expected_size:
+                if os.path.getsize(dest_path) == expected_size:
+                    tracker.set_image_status(album_key, image_key, "done")
+                    progress.advance(album_task_id, est_size)
+                    progress.advance(global_task_id, est_size)
+                    return "skipped"
+            else:
+                # Fallback: assume done if no expected size or MD5 and file can be opened
+                with open(dest_path, 'rb'):
+                    pass
                 tracker.set_image_status(album_key, image_key, "done")
                 progress.advance(album_task_id, est_size)
                 progress.advance(global_task_id, est_size)
                 return "skipped"
-            elif not expected_size:
-                # Fallback: assume done if no expected size or MD5 and file exists
-                tracker.set_image_status(album_key, image_key, "done")
-                progress.advance(album_task_id, est_size)
-                progress.advance(global_task_id, est_size)
-                return "skipped"
+    except OSError:
+        pass
 
     # 3. Get download URL
     download_url = image.get("ArchivedUri")
