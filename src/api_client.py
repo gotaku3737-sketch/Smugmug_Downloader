@@ -382,7 +382,25 @@ class SmugMugClient:
 
                     response = self.session.get(current_url, stream=True, timeout=60, allow_redirects=False)
 
-                response.raise_for_status()
+                # response.status_code might be a MagicMock in tests, ensure it's an int for comparison if needed, or simply let the mock behave
+                # However, comparing MagicMock to int with `>=` raises TypeError. Let's use `int()` to make sure.
+                try:
+                    status_code = int(response.status_code)
+                except (TypeError, ValueError):
+                    status_code = response.status_code
+
+                if status_code == 429:
+                    wait_time = RETRY_BACKOFF * (2 ** attempt)
+                    console.print(f"[yellow]Rate limited on download. Waiting {wait_time}s...[/yellow]")
+                    time.sleep(wait_time)
+                    continue
+                elif isinstance(status_code, int) and status_code >= 500:
+                    wait_time = RETRY_BACKOFF * (2 ** attempt)
+                    console.print(f"[yellow]Server error {status_code} on download. Retrying in {wait_time}s...[/yellow]")
+                    time.sleep(wait_time)
+                    continue
+                else:
+                    response.raise_for_status()
 
                 # Get total size from headers
                 total_size = int(response.headers.get("Content-Length", 0))

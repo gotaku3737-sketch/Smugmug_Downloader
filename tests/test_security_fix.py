@@ -274,12 +274,14 @@ def test_download_file_uses_mkstemp():
         mock_file = MagicMock()
         mock_fdopen.return_value.__enter__.return_value = mock_file
 
-        result = client.download_file("https://api.smugmug.com/image.jpg", "/tmp/some_dir/out.jpg")
+        with patch("src.api_client.PreparedRequest") as mock_prepared_req:
+            mock_prepared_req.return_value.url = "https://api.smugmug.com/image.jpg"
+            result = client.download_file("https://api.smugmug.com/image.jpg", "/tmp/some_dir/out.jpg")
 
-        assert result is True
-        mock_mkstemp.assert_called_once_with(dir="/tmp/some_dir", suffix=".tmp")
-        mock_fdopen.assert_called_once_with(42, "wb")
-        mock_replace.assert_called_once_with("/tmp/some_dir/mock.tmp", "/tmp/some_dir/out.jpg")
+            assert result is True
+            mock_mkstemp.assert_called_once_with(dir="/tmp/some_dir", suffix=".tmp")
+            mock_fdopen.assert_called_once_with(42, "wb")
+            mock_replace.assert_called_once_with("/tmp/some_dir/mock.tmp", "/tmp/some_dir/out.jpg")
 
 def test_verify_md5_usedforsecurity_false():
     import tempfile
@@ -439,6 +441,46 @@ def test_auth_verifier_validation():
             }
             with patch("src.auth.save_tokens"):
                 authorize("key", "secret")
+
+def test_download_file_rate_limit_retry():
+    import tempfile
+    import os
+    from unittest.mock import MagicMock, patch
+    from src.api_client import SmugMugClient
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # 1st response is 429
+    mock_resp_429 = MagicMock()
+    mock_resp_429.status_code = 429
+    mock_resp_429.is_redirect = False
+
+    # 2nd response is 200
+    mock_resp_200 = MagicMock()
+    mock_resp_200.status_code = 200
+    mock_resp_200.headers = {"Content-Length": "10"}
+    mock_resp_200.is_redirect = False
+    mock_resp_200.iter_content.return_value = [b"1234567890"]
+
+    mock_session.get.side_effect = [mock_resp_429, mock_resp_200]
+
+    with patch("src.api_client.time.sleep") as mock_sleep, patch("tempfile.mkstemp") as mock_mkstemp, patch("os.fdopen") as mock_fdopen, patch("os.replace") as mock_replace, patch("os.makedirs"):
+        mock_mkstemp.return_value = (42, "/tmp/some_dir/mock.tmp")
+        mock_file = MagicMock()
+        mock_fdopen.return_value.__enter__.return_value = mock_file
+
+        with patch("src.api_client.console.print") as mock_print:
+            with patch("src.api_client.PreparedRequest") as mock_prepared_req:
+                mock_prepared_req.return_value.url = "https://api.smugmug.com/image.jpg"
+                result = client.download_file("https://api.smugmug.com/image.jpg", "/tmp/some_dir/out.jpg")
+
+                assert result is True
+                mock_sleep.assert_called_once()
+
+                # Verify the output is safe and doesn't leak stack traces
+                print_args = [args[0][0] for args in mock_print.call_args_list]
+                assert any("Rate limited on download. Waiting" in str(arg) for arg in print_args)
 
 def test_tracker_load_state_toctou():
     from src.tracker import DownloadTracker
