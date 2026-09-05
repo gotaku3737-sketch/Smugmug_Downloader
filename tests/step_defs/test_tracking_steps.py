@@ -124,3 +124,62 @@ def request_reset_state(tracker):
 @then("the tracker state file should be cleared or deleted")
 def state_file_cleared(tracker):
     assert len(tracker.state["albums"]) == 0
+
+
+# --- Scenarios: Safe state loading and EAFP file check ---
+
+@given("no state file exists on disk")
+def no_state_file_on_disk(tmp_path):
+    pytest.non_existent_state_path = str(tmp_path / "non_existent_state.json")
+    if os.path.exists(pytest.non_existent_state_path):
+        os.remove(pytest.non_existent_state_path)
+
+
+@when("the download tracker initializes its state")
+def tracker_initializes_state():
+    tracker = DownloadTracker(pytest.non_existent_state_path)
+    pytest.loaded_state = tracker._load_state()
+
+
+@then("it should safely return an empty state without raising an error")
+def returns_empty_state_safely():
+    assert pytest.loaded_state == {"albums": {}, "last_updated": None}
+
+
+@given("a file download destination path encounters an OS error")
+def destination_encounters_os_error():
+    pass
+
+
+@when("the downloader worker checks the destination file")
+def worker_checks_destination_file():
+    from src.downloader import download_image_worker
+    from unittest.mock import MagicMock, patch
+
+    mock_client = MagicMock()
+    mock_tracker = MagicMock()
+    mock_tracker.is_image_done.return_value = False
+
+    mock_image = {"ArchivedSize": 100, "ArchivedUri": "http://example.com/img.jpg"}
+    mock_progress = MagicMock()
+
+    with patch("os.stat") as mock_stat:
+        mock_stat.side_effect = OSError("Simulated file access error")
+        result = download_image_worker(
+            client=mock_client,
+            tracker=mock_tracker,
+            image=mock_image,
+            album_key="album_1",
+            album_dir="/tmp/album_1",
+            progress=mock_progress,
+            album_task_id=1,
+            global_task_id=2
+        )
+        pytest.mock_client = mock_client
+        pytest.worker_result = result
+
+
+@then("it should safely proceed to download the file")
+def safely_proceed_download():
+    assert pytest.mock_client.download_file.called
+

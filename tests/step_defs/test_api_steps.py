@@ -92,3 +92,61 @@ def raise_exception(client):
         with pytest.raises(SmugMugAPIError) as exc_info:
             client._request("GET", "/api")
         assert "Max retries exceeded" in str(exc_info.value)
+
+
+# --- Scenarios: Retrying file download on 429 rate limit & 500 server error ---
+
+@given("a file download receives a 429 Too Many Requests response")
+def download_receives_429(mock_session):
+    resp_429 = MagicMock()
+    resp_429.status_code = 429
+    resp_429.is_redirect = False
+
+    resp_200 = MagicMock()
+    resp_200.status_code = 200
+    resp_200.headers = {"Content-Length": "5"}
+    resp_200.is_redirect = False
+    resp_200.iter_content.return_value = [b"hello"]
+
+    mock_session.get.side_effect = [resp_429, resp_200]
+
+
+@given("a file download receives a 500 Internal Server Error response")
+def download_receives_500(mock_session):
+    resp_500 = MagicMock()
+    resp_500.status_code = 500
+    resp_500.is_redirect = False
+
+    resp_200 = MagicMock()
+    resp_200.status_code = 200
+    resp_200.headers = {"Content-Length": "5"}
+    resp_200.is_redirect = False
+    resp_200.iter_content.return_value = [b"hello"]
+
+    mock_session.get.side_effect = [resp_500, resp_200]
+
+
+@when("the download client retries with exponential backoff")
+def download_client_retries(client, tmp_path):
+    dest_path = str(tmp_path / "downloaded.jpg")
+    with patch("src.api_client.time.sleep") as mock_sleep:
+        with patch("src.api_client.PreparedRequest") as mock_prepared:
+            mock_prepared.return_value.url = "https://photos.smugmug.com/img.jpg"
+            result = client.download_file("https://photos.smugmug.com/img.jpg", dest_path)
+            pytest.download_result = result
+            pytest.mock_sleep_called = mock_sleep.called
+
+
+@then("the file download should succeed after the delay")
+def download_succeeds_after_delay(mock_session):
+    assert pytest.download_result is True
+    assert pytest.mock_sleep_called is True
+    assert mock_session.get.call_count == 2
+
+
+@then("the file download should succeed after the server recovers")
+def download_succeeds_after_server_recovers(mock_session):
+    assert pytest.download_result is True
+    assert pytest.mock_sleep_called is True
+    assert mock_session.get.call_count == 2
+

@@ -41,8 +41,8 @@ The SmugMug Downloader is designed as a modular, resilient CLI backup utility bu
 
 ## 3. Test Verification & Quality Assurance
 
-The codebase is covered by **97 automated tests**:
-- **Behavior-Driven Development (BDD)**: Gherkin specs executed with `pytest-bdd`:
+The codebase is covered by **107 automated tests**:
+- **Behavior-Driven Development (BDD)**: Gherkin specs executed with `pytest-bdd` (23 scenarios):
   - `features/api_resilience.feature`
   - `features/authentication.feature`
   - `features/cli_workflows.feature`

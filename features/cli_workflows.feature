@@ -18,3 +18,8 @@ Feature: CLI Workflows
     Given some files have been downloaded
     When the user runs the CLI with "--status"
     Then the CLI should display the current number of tracked files
+
+  Scenario: Resetting tracking state via CLI
+    Given the user specifies the reset flag "--reset"
+    When the CLI executes the reset command
+    Then the tracker state should be cleared without requiring API authentication

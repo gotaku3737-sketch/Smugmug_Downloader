@@ -98,3 +98,35 @@ def run_cli_status():
 @then("the CLI should display the current number of tracked files")
 def cli_display_tracked_files():
     assert pytest.mock_show_status.called
+
+
+# --- Scenario: Resetting tracking state via CLI ---
+
+@given('the user specifies the reset flag "--reset"')
+def specify_reset_flag():
+    pass
+
+
+@when("the CLI executes the reset command")
+def execute_reset_command(tmp_path):
+    from src.cli import main
+    output_dir = str(tmp_path / "downloads")
+    test_args = ["smugmug-download", "--reset", "-o", output_dir]
+
+    with patch.object(sys, 'argv', test_args):
+        with patch("src.cli.get_api_credentials") as mock_creds:
+            with patch("src.cli.get_oauth_session") as mock_session:
+                with patch("src.tracker.DownloadTracker") as mock_tracker_cls:
+                    mock_tracker_inst = mock_tracker_cls.return_value
+                    main()
+                    pytest.mock_tracker_inst = mock_tracker_inst
+                    pytest.mock_creds = mock_creds
+                    pytest.mock_session = mock_session
+
+
+@then("the tracker state should be cleared without requiring API authentication")
+def tracker_state_cleared_no_auth():
+    assert pytest.mock_tracker_inst.reset.called
+    assert not pytest.mock_creds.called
+    assert not pytest.mock_session.called
+
