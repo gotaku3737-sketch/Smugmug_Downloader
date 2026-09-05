@@ -26,6 +26,7 @@ Smugmug_Downloader/
 ├── setup.py                         # Package installation script (defines `smd` and `smugmug-download`)
 ├── pyproject.toml                   # Project metadata and setuptools configuration
 ├── PLAN.md                          # Architecture overview, hardening status & roadmap plan
+├── AGENTS.md                        # Multi-agent coordination rules, roles & instructions
 ├── .env.example                     # API credential template
 ├── features/                        # Gherkin BDD Feature Specification Files
 │   ├── api_resilience.feature       # Backoff retries for HTTP 429/500/503 errors

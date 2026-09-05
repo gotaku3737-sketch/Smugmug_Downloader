@@ -57,7 +57,16 @@ The codebase is covered by **107 automated tests**:
 
 ---
 
-## 4. Future Roadmap & Upcoming Milestones
+## 4. Multi-Agent Coordination Guidelines
+
+Autonomous agents operating on this repository must follow the shared ground rules defined in [AGENTS.md](file:///Users/domu904/Projects/Smugmug_Downloader/AGENTS.md), including:
+- Adhering to Sentinel security invariants (EAFP pattern, Rich escaping, parameter URL encoding).
+- Maintaining dual test coverage (unit tests and BDD specs in `features/`).
+- Using specialized agent roles (Security Auditor, BDD & QA Engineer, Core Developer, Release Coordinator).
+
+---
+
+## 5. Future Roadmap & Upcoming Milestones
 
 ### Phase 1: Performance & Resilience Enhancements
 - [ ] **Dynamic Rate Limiter Telemetry**: Auto-tune worker thread pool and request pace based on HTTP 429 `Retry-After` headers and API latency.
