@@ -451,3 +451,33 @@ def test_tracker_load_state_toctou():
     # _load_state should securely handle this and return default state
     state = tracker._load_state()
     assert state == {"albums": {}, "last_updated": None}
+
+def test_downloader_check_exists_toctou():
+    from src.downloader import download_image_worker
+    from unittest.mock import MagicMock, patch
+
+    mock_client = MagicMock()
+    mock_tracker = MagicMock()
+    mock_tracker.is_image_done.return_value = False
+
+    mock_image = {"ArchivedSize": 100, "ArchivedUri": "http://test"}
+    mock_progress = MagicMock()
+
+    with patch("os.stat") as mock_stat:
+        # Simulate file not found
+        mock_stat.side_effect = OSError("File not found")
+
+        # Call the worker. It should handle the OSError and proceed to download
+        result = download_image_worker(
+            client=mock_client,
+            tracker=mock_tracker,
+            image=mock_image,
+            album_key="album_key",
+            album_dir="/tmp/test_dir",
+            progress=mock_progress,
+            album_task_id=1,
+            global_task_id=2
+        )
+
+        # It should try to download
+        assert mock_client.download_file.called
