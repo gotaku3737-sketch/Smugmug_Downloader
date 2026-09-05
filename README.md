@@ -13,7 +13,7 @@ A Python CLI tool to download **all galleries (albums)** from a SmugMug account 
 - **Resume support** — tracks per-image download state in a JSON file (`.smugmug_download_state.json`); interrupted downloads resume seamlessly.
 - **Retry with exponential backoff** — automatically retries on rate limits (HTTP 429), server errors (HTTP 500/503), and connection failures.
 - **Original quality** — downloads full-resolution archived photos and videos.
-- **Hardened Security & Path Traversal Protection** — protects against API parameter and file path traversal, SSRF via endpoint and redirect validation, terminal injection via Rich tag escaping, stack trace/credential leakage, and enforces secure token file permissions.
+- **Hardened Security & TOCTOU Protection** — protects against API parameter and file path traversal, SSRF via endpoint and redirect validation, terminal injection via Rich tag escaping, stack trace/credential leakage, atomic token file creation, EAFP-based TOCTOU race condition mitigation for file operations and state loading, and strict 6-digit OAuth verifier validation.
 
 ## Project Architecture & Specs
 
@@ -25,6 +25,7 @@ Smugmug_Downloader/
 ├── requirements.txt                 # Python runtime and testing dependencies
 ├── setup.py                         # Package installation script (defines `smd` and `smugmug-download`)
 ├── pyproject.toml                   # Project metadata and setuptools configuration
+├── PLAN.md                          # Architecture overview, hardening status & roadmap plan
 ├── .env.example                     # API credential template
 ├── features/                        # Gherkin BDD Feature Specification Files
 │   ├── api_resilience.feature       # Backoff retries for HTTP 429/500/503 errors
@@ -36,10 +37,10 @@ Smugmug_Downloader/
 ├── src/                             # Core Python implementation package
 │   ├── __init__.py                  # Version declaration (v1.0.0)
 │   ├── config.py                    # Credential resolution (Env vars > Static constants > CLI prompt)
-│   ├── auth.py                      # OAuth 1.0a authentication & token persistence
-│   ├── api_client.py                # SmugMug API wrapper (pagination, backoff, download stream)
-│   ├── tracker.py                   # JSON state tracking engine (.smugmug_download_state.json)
-│   ├── downloader.py                # Concurrent download engine and progress reporting
+│   ├── auth.py                      # OAuth 1.0a authentication, verifier validation & token persistence
+│   ├── api_client.py                # SmugMug API wrapper (pagination, backoff, atomic temp downloads)
+│   ├── tracker.py                   # JSON state tracking engine (atomic write & EAFP state loading)
+│   ├── downloader.py                # Concurrent download engine (EAFP file checks & progress reporting)
 │   └── cli.py                       # Command line interface parsing & command dispatch
 └── tests/                           # Test suite
     ├── step_defs/                   # BDD step definition files for pytest-bdd
@@ -52,7 +53,7 @@ Smugmug_Downloader/
     ├── test_tracker.py              # Unit tests for DownloadTracker
     ├── test_api_client.py           # Unit tests for SmugMugClient
     ├── test_downloader.py           # Unit tests for download orchestration
-    └── test_security_fix.py         # Unit tests for terminal injection and security fixes
+    └── test_security_fix.py         # Unit tests for terminal injection, TOCTOU, SSRF & security fixes
 ```
 
 ## Setup
@@ -95,8 +96,8 @@ smugmug-download
 On first run, the app will:
 1. Prompt for API credentials (if not already configured)
 2. Prompt for destination folder (default: `./smugmug_downloads`)
-3. Open a browser window to authorize access via OAuth 1.0a
-4. Save access tokens to `.smugmug_tokens.json` and start downloading all albums
+3. Open a browser window to authorize access via OAuth 1.0a and prompt for the 6-digit PIN
+4. Validate the 6-digit PIN, securely save access tokens to `.smugmug_tokens.json` (chmod 0600), and start downloading all albums
 
 ### Specifying concurrent workers
 
