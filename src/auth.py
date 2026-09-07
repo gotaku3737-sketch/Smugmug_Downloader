@@ -50,7 +50,12 @@ def save_tokens(tokens):
         tokens (dict): Token dict with 'oauth_token' and 'oauth_token_secret'.
     """
     try:
-        fd = os.open(TOKEN_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        # Security enhancement: Prevent symlink attacks by avoiding following symlinks
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+
+        fd = os.open(TOKEN_FILE, flags, 0o600)
         with os.fdopen(fd, "w") as f:
             json.dump(tokens, f, indent=2)
         console.print(

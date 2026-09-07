@@ -13,9 +13,21 @@ sys.modules["rich.progress"] = mock_rich.progress
 sys.modules["rich.table"] = mock_rich.table
 sys.modules["requests_oauthlib"] = MagicMock()
 # Mock requests to avoid ModuleNotFoundError since its not available during this test run without doing pip install
+import requests.models
+RealPreparedRequest = requests.models.PreparedRequest
+
+class FakePreparedRequest:
+    def __init__(self):
+        self.url = None
+    def prepare_url(self, url, params):
+        real_p = RealPreparedRequest()
+        real_p.prepare_url(url, params)
+        self.url = real_p.url
+
 sys.modules["requests"] = MagicMock()
 sys.modules["requests.models"] = MagicMock()
-sys.modules["requests.models.PreparedRequest"] = MagicMock()
+sys.modules["requests.models"].PreparedRequest = FakePreparedRequest
+sys.modules["requests.models.PreparedRequest"] = FakePreparedRequest
 
 import src.config
 import src.auth
@@ -73,9 +85,13 @@ def test_save_tokens_uses_secure_permissions():
 
             src.auth.save_tokens(tokens)
 
+            expected_flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+            if hasattr(os, "O_NOFOLLOW"):
+                expected_flags |= os.O_NOFOLLOW
+
             mock_open.assert_called_once_with(
                 src.auth.TOKEN_FILE,
-                os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                expected_flags,
                 0o600
             )
             mock_fdopen.assert_called_once_with(42, "w")
