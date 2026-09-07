@@ -75,3 +75,8 @@
 **Vulnerability:** The `download_file` method in `src/api_client.py` did not explicitly handle HTTP 429 (Rate Limit) or 500+ (Server Error) status codes. Instead, it blindly called `response.raise_for_status()`, which raised a generic `HTTPError`. This exception bubbled up to a generic `except Exception as e:` block which could inadvertently leak internal request/response details, stack traces, or other verbose information during failures.
 **Learning:** API clients must proactively and explicitly intercept expected non-200 HTTP statuses (like rate limits and server errors) before generic exception handlers evaluate them. This ensures safe error output, deterministic retries, and prevents verbose library exceptions from leaking contextual information.
 **Prevention:** Explicitly check `response.status_code` for 429 and >= 500 conditions, handle the backoff logic manually, and log a sanitized error message rather than allowing the HTTP client library to throw unhandled exceptions.
+
+## 2026-10-25 - Prevent Symlink Attacks during Direct File Creation
+**Vulnerability:** The application used `os.open(..., os.O_CREAT | os.O_TRUNC)` to create sensitive token caches. If an attacker created a symlink at the destination path before the application ran, `os.open` would follow it and truncate the target file, even if explicit permissions were requested.
+**Learning:** Using `O_CREAT` and `O_TRUNC` is not sufficient to prevent symlink attacks. Local file creation must ensure it operates on standard files rather than following attacker-controlled links.
+**Prevention:** Always bitwise OR `os.O_NOFOLLOW` (when available in the OS) to the flags of `os.open` to atomically reject following symbolic links during file creation.
