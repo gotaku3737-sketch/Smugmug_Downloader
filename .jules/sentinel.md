@@ -80,3 +80,8 @@
 **Vulnerability:** The application used `os.open(..., os.O_CREAT | os.O_TRUNC)` to create sensitive token caches. If an attacker created a symlink at the destination path before the application ran, `os.open` would follow it and truncate the target file, even if explicit permissions were requested.
 **Learning:** Using `O_CREAT` and `O_TRUNC` is not sufficient to prevent symlink attacks. Local file creation must ensure it operates on standard files rather than following attacker-controlled links.
 **Prevention:** Always bitwise OR `os.O_NOFOLLOW` (when available in the OS) to the flags of `os.open` to atomically reject following symbolic links during file creation.
+
+## 2026-10-02 - Terminal Output Injection via Exception Messages
+**Vulnerability:** While external inputs were mostly sanitized before being passed to `console.print()`, they were embedded unsanitized into exception strings (e.g., `SmugMugAPIError(0, f"Security Error: Invalid endpoint '{endpoint}'")`). If these exceptions bubbled up and were printed by a higher-level error handler using `console.print` without further escaping, or if the handler mistakenly escaped the entire `str(e)` assuming it didn't contain markup from internal logic, terminal injection attacks could still occur.
+**Learning:** Terminal Output Injection fixes must trace data flow. When embedding untrusted inputs into exception objects, consider whether the downstream error logging or CLI presentation layer will securely escape them or evaluate markup.
+**Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs when embedding them into exception strings that may be rendered by a markup-aware display library.

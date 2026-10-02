@@ -82,7 +82,7 @@ class SmugMugClient:
         """
         # Security fix: Prevent SSRF via manipulated endpoint paths (e.g. NextPage)
         if not endpoint.startswith("/"):
-            raise SmugMugAPIError(0, f"Security Error: Invalid endpoint '{endpoint}'. Must start with '/'")
+            raise SmugMugAPIError(0, f"Security Error: Invalid endpoint '{escape(endpoint)}'. Must start with '/'")
         url = f"{self.base_url}{endpoint}"
 
         if params is None:
@@ -124,7 +124,7 @@ class SmugMugClient:
                     redir_host = parsed_redir.hostname or ""
 
                     if parsed_redir.scheme != "https" or not (redir_host == "smugmug.com" or redir_host.endswith(".smugmug.com")):
-                        raise SmugMugAPIError(0, f"Security Error: Refusing redirect to untrusted URL: {current_url}")
+                        raise SmugMugAPIError(0, f"Security Error: Refusing redirect to untrusted URL: {escape(current_url)}")
 
                     # Determine correct HTTP method for redirect per HTTP spec
                     if response.status_code in (301, 302, 303):
