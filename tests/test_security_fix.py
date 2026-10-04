@@ -348,6 +348,7 @@ def test_terminal_injection_prevention():
     assert "escape(url)" in api_code
     assert "escape(hostname)" in api_code
     assert "escape(current_url)" in api_code
+    assert "escape(endpoint)" in api_code
     assert "escape(str(e))" in api_code
     assert "escape(expected_md5)" in api_code
 
