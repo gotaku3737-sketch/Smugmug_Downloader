@@ -160,7 +160,7 @@ class SmugMugClient:
                 else:
                     raise SmugMugAPIError(
                         response.status_code,
-                        response.text[:500],
+                        escape(response.text[:500]),
                     )
 
             except (ConnectionError, TimeoutError, OSError) as e:
@@ -172,7 +172,7 @@ class SmugMugClient:
                 time.sleep(wait_time)
                 continue
 
-        raise SmugMugAPIError(0, f"Max retries exceeded. Last error: {str(last_error)}")
+        raise SmugMugAPIError(0, f"Max retries exceeded. Last error: {escape(str(last_error))}")
 
     def _paginate(self, endpoint, params=None, response_key=None):
         """Fetch all pages of a paginated API endpoint.

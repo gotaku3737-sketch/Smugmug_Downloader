@@ -540,3 +540,43 @@ def test_downloader_check_exists_toctou():
 
         # It should try to download
         assert mock_client.download_file.called
+
+def test_api_client_prevents_terminal_injection_in_exception():
+    from src.api_client import SmugMugClient, SmugMugAPIError
+    from unittest.mock import MagicMock, patch
+    import pytest
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # 1. Test response text injection
+    mock_resp_400 = MagicMock()
+    mock_resp_400.status_code = 400
+    mock_resp_400.text = "Bad Request: [red]Malicious payload[/red]"
+    mock_resp_400.is_redirect = False
+
+    mock_session.request.return_value = mock_resp_400
+
+    # Patch escape since rich might be mocked globally in this test file
+    with patch("src.api_client.escape", side_effect=lambda x: x.replace("[", r"\[").replace("]", r"\]")):
+        with patch("src.api_client.time.sleep"):
+            with patch("src.api_client.console.print"):
+                with pytest.raises(SmugMugAPIError) as exc_info:
+                    client._request("GET", "/api/v2!test")
+
+                # Verify that the message was properly escaped
+                assert r"\[red\]Malicious payload\[/red\]" in str(exc_info.value), \
+                    f"API error message was not properly escaped: {exc_info.value}"
+                assert "[red]Malicious payload[/red]" not in str(exc_info.value), \
+                    f"API error message contains unescaped markup: {exc_info.value}"
+
+                # 2. Test last_error injection
+                mock_session.request.side_effect = ConnectionError("Failed to connect: [blue]attack[/blue]")
+
+                with pytest.raises(SmugMugAPIError) as exc_info:
+                    client._request("GET", "/api/v2!test")
+
+                assert r"\[blue\]attack\[/blue\]" in str(exc_info.value), \
+                    f"Connection error message was not properly escaped: {exc_info.value}"
+                assert "[blue]attack[/blue]" not in str(exc_info.value), \
+                    f"Connection error message contains unescaped markup: {exc_info.value}"
