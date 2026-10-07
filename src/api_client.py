@@ -160,7 +160,7 @@ class SmugMugClient:
                 else:
                     raise SmugMugAPIError(
                         response.status_code,
-                        response.text[:500],
+                        escape(response.text[:500]),
                     )
 
             except (ConnectionError, TimeoutError, OSError) as e:
