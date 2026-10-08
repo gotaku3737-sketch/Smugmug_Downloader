@@ -540,3 +540,27 @@ def test_downloader_check_exists_toctou():
 
         # It should try to download
         assert mock_client.download_file.called
+
+
+def test_api_client_exception_message_injection():
+    import sys
+    from unittest.mock import MagicMock, patch
+    from src.api_client import SmugMugClient, SmugMugAPIError
+    import pytest
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # 1st response is 403
+    mock_resp_403 = MagicMock()
+    mock_resp_403.status_code = 403
+    mock_resp_403.text = "Forbidden! [red]Hacked[/red]"
+    mock_resp_403.is_redirect = False
+
+    mock_session.request.return_value = mock_resp_403
+
+    with patch("src.api_client.escape", side_effect=lambda x: str(x).replace("[", "\\[").replace("]", "\\]")) as mock_escape:
+        with pytest.raises(SmugMugAPIError) as exc_info:
+            client._request("GET", "/some/endpoint")
+
+        assert "\\[red\\]Hacked\\[/red\\]" in str(exc_info.value.message)
