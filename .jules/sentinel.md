@@ -89,3 +89,8 @@
 **Vulnerability:** In `src/api_client.py`, when a non-retriable server error occurred (e.g. 403 Forbidden), the raw unescaped HTTP response body (`response.text[:500]`) was embedded directly into the `SmugMugAPIError` message. If a malicious API endpoint or network attacker returned an HTTP response with embedded rich markup tags (e.g., `[red]`), this would trigger terminal output injection when the error bubbled up and was printed to the console in `src/cli.py`.
 **Learning:** External inputs like API response bodies must always be sanitized before being included in exception messages that will eventually be rendered by a markup-aware display library like `rich`, especially when the top-level error handler does not escape the `message` property independently.
 **Prevention:** Use `rich.markup.escape()` on HTTP response bodies and other untrusted strings before embedding them into exceptions.
+
+## 2026-10-26 - Stack Trace Leakage via KeyboardInterrupt
+**Vulnerability:** The CLI entry point caught generic `Exception`s, but not `BaseException`s such as `KeyboardInterrupt`. When a user sent a SIGINT (e.g., Ctrl+C) outside of the specific handled blocks, it bubbled up to the Python interpreter, which printed a full stack trace to stderr. This could leak internal architecture, sensitive file paths, and local states.
+**Learning:** In CLI applications, relying on a `try...except Exception as e:` block at the top level is insufficient, because system-exiting exceptions like `KeyboardInterrupt` and `SystemExit` inherit from `BaseException`, not `Exception`.
+**Prevention:** Explicitly catch `KeyboardInterrupt` in the top-level block, print a safe "cancelled" message, and exit with `sys.exit(130)` (the standard exit code for SIGINT).
