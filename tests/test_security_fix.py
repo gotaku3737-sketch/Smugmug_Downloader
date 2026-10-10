@@ -564,3 +564,29 @@ def test_api_client_exception_message_injection():
             client._request("GET", "/some/endpoint")
 
         assert "\\[red\\]Hacked\\[/red\\]" in str(exc_info.value.message)
+
+def test_cli_prevents_keyboard_interrupt_stack_trace_leakage():
+    import sys
+    from unittest.mock import patch, MagicMock
+    from src.cli import main
+
+    with patch("src.cli.get_api_credentials", side_effect=KeyboardInterrupt), \
+         patch("src.cli.console.print") as mock_print, \
+         patch("sys.exit") as mock_exit, \
+         patch("src.cli.argparse.ArgumentParser.parse_args", return_value=MagicMock(status=False, reset=False)):
+
+        main()
+
+        # Verify sys.exit(130) was called
+        mock_exit.assert_called_once_with(130)
+
+        # Check that the exception was printed and escaped correctly
+        print_calls = mock_print.call_args_list
+        found_msg = False
+        for call in print_calls:
+            msg = call[0][0]
+            if "Operation cancelled by user" in msg:
+                found_msg = True
+                break
+
+        assert found_msg, "The cancellation message was not printed."

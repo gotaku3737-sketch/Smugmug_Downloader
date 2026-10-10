@@ -144,6 +144,9 @@ def main():
             f"{escape(os.path.abspath(output_dir))}[/dim]\n"
         )
         run_download(client, output_dir, album_filter=args.album, workers=args.workers)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Operation cancelled by user.[/yellow]")
+        sys.exit(130)
     except Exception as e:
         console.print(f"\n[bold red]An unexpected error occurred: {escape(str(e))}[/bold red]")
         sys.exit(1)
