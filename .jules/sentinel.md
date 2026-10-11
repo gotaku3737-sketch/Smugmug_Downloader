@@ -94,3 +94,8 @@
 **Vulnerability:** The CLI entry point caught generic `Exception`s, but not `BaseException`s such as `KeyboardInterrupt`. When a user sent a SIGINT (e.g., Ctrl+C) outside of the specific handled blocks, it bubbled up to the Python interpreter, which printed a full stack trace to stderr. This could leak internal architecture, sensitive file paths, and local states.
 **Learning:** In CLI applications, relying on a `try...except Exception as e:` block at the top level is insufficient, because system-exiting exceptions like `KeyboardInterrupt` and `SystemExit` inherit from `BaseException`, not `Exception`.
 **Prevention:** Explicitly catch `KeyboardInterrupt` in the top-level block, print a safe "cancelled" message, and exit with `sys.exit(130)` (the standard exit code for SIGINT).
+
+## 2026-10-27 - Terminal Output Injection via Unescaped Exception Message in API Client
+**Vulnerability:** In `src/api_client.py`, when a connection error persisted and max retries were exceeded, the `SmugMugAPIError` was raised containing the raw `str(last_error)`. If this error bubbled up and was printed by a higher-level error handler using `console.print` without escaping, or if the handler mistakenly didn't escape it, terminal injection attacks could occur via malicious text in the exception string.
+**Learning:** Terminal Output Injection fixes must trace data flow. When embedding untrusted inputs or exception texts into exception strings that will eventually be rendered by a markup-aware display library like `rich`, they must be escaped.
+**Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs when embedding them into exception strings that may be rendered by a markup-aware display library.

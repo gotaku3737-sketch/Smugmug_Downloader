@@ -590,3 +590,23 @@ def test_cli_prevents_keyboard_interrupt_stack_trace_leakage():
                 break
 
         assert found_msg, "The cancellation message was not printed."
+
+def test_api_client_max_retries_exception_message_injection():
+    import sys
+    from unittest.mock import MagicMock, patch
+    from src.api_client import SmugMugClient, SmugMugAPIError
+    import pytest
+    from requests.exceptions import ConnectionError
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # Make session raise ConnectionError with a malicious string
+    mock_session.request.side_effect = ConnectionError("Connection refused [red]malicious[/red]")
+
+    with patch("src.api_client.escape", side_effect=lambda x: str(x).replace("[", "\\[").replace("]", "\\]")) as mock_escape, \
+         patch("src.api_client.time.sleep"):
+        with pytest.raises(SmugMugAPIError) as exc_info:
+            client._request("GET", "/some/endpoint")
+
+        assert "\\[red\\]malicious\\[/red\\]" in str(exc_info.value.message)
