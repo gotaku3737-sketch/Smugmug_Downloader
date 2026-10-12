@@ -99,3 +99,8 @@
 **Vulnerability:** In `src/api_client.py`, when a connection error persisted and max retries were exceeded, the `SmugMugAPIError` was raised containing the raw `str(last_error)`. If this error bubbled up and was printed by a higher-level error handler using `console.print` without escaping, or if the handler mistakenly didn't escape it, terminal injection attacks could occur via malicious text in the exception string.
 **Learning:** Terminal Output Injection fixes must trace data flow. When embedding untrusted inputs or exception texts into exception strings that will eventually be rendered by a markup-aware display library like `rich`, they must be escaped.
 **Prevention:** Always use `escape` from `rich.markup` to sanitize all external or user-controlled inputs when embedding them into exception strings that may be rendered by a markup-aware display library.
+
+## 2026-10-27 - Missing Input Length Limits (DoS Risk) in API Downloader
+**Vulnerability:** The `download_file` method streamed data indiscriminately using `response.iter_content` without enforcing any maximum size limit. This allows an attacker (or a compromised upstream server) to feed an unbounded stream of bytes, leading to local disk exhaustion (a form of Denial of Service, similar to a Zip-Bomb attack).
+**Learning:** Streaming API clients must never blindly write network data to disk without enforcing predefined hard limits, even if a `Content-Length` header is provided (as headers can be spoofed or omitted by an attacker).
+**Prevention:** Always enforce a configurable maximum download threshold (`MAX_DOWNLOAD_SIZE`) during chunk iteration. If the bytes read exceed this threshold, the download should be immediately aborted and the partial temporary file must be safely deleted.

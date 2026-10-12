@@ -320,7 +320,7 @@ class SmugMugClient:
             bool: True if download succeeded.
         """
 
-        from src.config import CHUNK_SIZE
+        from src.config import CHUNK_SIZE, MAX_DOWNLOAD_SIZE
         import os
         import tempfile
 
@@ -421,6 +421,13 @@ class SmugMugClient:
                             if chunk:
                                 f.write(chunk)
                                 downloaded += len(chunk)
+                                if downloaded > MAX_DOWNLOAD_SIZE:
+                                    console.print(f"[red]Security Error: Download exceeded {MAX_DOWNLOAD_SIZE} bytes. Aborting to prevent DoS.[/red]")
+                                    try:
+                                        os.remove(temp_path)
+                                    except OSError:
+                                        pass
+                                    return False
                                 if progress_callback:
                                     progress_callback(len(chunk))
 
