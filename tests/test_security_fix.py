@@ -610,3 +610,55 @@ def test_api_client_max_retries_exception_message_injection():
             client._request("GET", "/some/endpoint")
 
         assert "\\[red\\]malicious\\[/red\\]" in str(exc_info.value.message)
+
+def test_download_file_prevents_unbounded_stream_dos():
+    import os
+    import tempfile
+    from unittest.mock import MagicMock, patch
+    from src.api_client import SmugMugClient
+    from src.config import MAX_DOWNLOAD_SIZE
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    mock_resp_200 = MagicMock()
+    mock_resp_200.status_code = 200
+    mock_resp_200.headers = {"Content-Length": str(MAX_DOWNLOAD_SIZE + 100)}
+    mock_resp_200.is_redirect = False
+
+    # Use generator to simulate chunks that exceed MAX_DOWNLOAD_SIZE without allocating a ton of memory in the test
+    def mock_iter_content(*args, **kwargs):
+        chunk_size = 1024 * 1024 * 1024 # 1 GB
+        num_chunks = (MAX_DOWNLOAD_SIZE // chunk_size) + 1
+        for _ in range(num_chunks):
+            # We don't actually need the chunk to be exactly chunk_size in memory if we mock len()
+            # Wait, the code uses len(chunk), so we need a mock object that returns chunk_size for len()
+            class MockChunk:
+                def __len__(self):
+                    return chunk_size
+            yield MockChunk()
+
+    mock_resp_200.iter_content = mock_iter_content
+
+    mock_session.get.return_value = mock_resp_200
+
+    with patch("tempfile.mkstemp") as mock_mkstemp, patch("os.fdopen") as mock_fdopen, patch("os.remove") as mock_remove, patch("os.makedirs"):
+        mock_mkstemp.return_value = (42, "/tmp/some_dir/mock.tmp")
+        mock_file = MagicMock()
+        mock_fdopen.return_value.__enter__.return_value = mock_file
+
+        with patch("src.api_client.console.print") as mock_print:
+            with patch("src.api_client.PreparedRequest") as mock_prepared_req:
+                mock_prepared_req.return_value.url = "https://api.smugmug.com/image.jpg"
+
+                # Should return False as it aborts
+                result = client.download_file("https://api.smugmug.com/image.jpg", "/tmp/some_dir/out.jpg")
+
+                assert result is False
+
+                # Ensure os.remove was called to clean up the temp file
+                mock_remove.assert_called_with("/tmp/some_dir/mock.tmp")
+
+                # Verify the security error was printed
+                print_args = [args[0][0] for args in mock_print.call_args_list]
+                assert any(f"Download exceeded {MAX_DOWNLOAD_SIZE} bytes" in str(arg) for arg in print_args)
