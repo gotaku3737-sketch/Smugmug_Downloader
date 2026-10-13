@@ -320,7 +320,7 @@ class SmugMugClient:
             bool: True if download succeeded.
         """
 
-        from src.config import CHUNK_SIZE
+        from src.config import CHUNK_SIZE, MAX_DOWNLOAD_SIZE
         import os
         import tempfile
 
@@ -404,6 +404,9 @@ class SmugMugClient:
 
                 # Get total size from headers
                 total_size = int(response.headers.get("Content-Length", 0))
+                if total_size > MAX_DOWNLOAD_SIZE:
+                    console.print(f"[red]Security Error: Content-Length ({total_size} bytes) exceeds maximum allowed download size of {MAX_DOWNLOAD_SIZE} bytes.[/red]")
+                    return False
                 if total_size and progress_callback and hasattr(progress_callback, "set_actual_size"):
                     progress_callback.set_actual_size(total_size)
 
@@ -421,6 +424,8 @@ class SmugMugClient:
                             if chunk:
                                 f.write(chunk)
                                 downloaded += len(chunk)
+                                if downloaded > MAX_DOWNLOAD_SIZE:
+                                    raise ValueError(f"Security Error: Downloaded size exceeded maximum allowed size of {MAX_DOWNLOAD_SIZE} bytes.")
                                 if progress_callback:
                                     progress_callback(len(chunk))
 
@@ -453,6 +458,9 @@ class SmugMugClient:
                     raise
 
             except Exception as e:
+                if isinstance(e, ValueError) and str(e).startswith("Security Error:"):
+                    console.print(f"[red]{escape(str(e))}[/red]")
+                    return False
                 wait_time = RETRY_BACKOFF * (2 ** attempt)
                 console.print(
                     f"[yellow]Download error: {escape(str(e))}. Retrying in {wait_time}s...[/yellow]"
