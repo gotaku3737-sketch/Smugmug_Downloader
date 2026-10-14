@@ -610,3 +610,41 @@ def test_api_client_max_retries_exception_message_injection():
             client._request("GET", "/some/endpoint")
 
         assert "\\[red\\]malicious\\[/red\\]" in str(exc_info.value.message)
+
+def test_download_file_enforces_max_download_size():
+    from src.api_client import SmugMugClient
+    from unittest.mock import MagicMock, patch
+    import src.config
+
+    mock_session = MagicMock()
+    client = SmugMugClient(mock_session)
+
+    # Test 1: Content-Length exceeds MAX_DOWNLOAD_SIZE
+    mock_resp_large_header = MagicMock()
+    mock_resp_large_header.status_code = 200
+    mock_resp_large_header.headers = {"Content-Length": str(src.config.MAX_DOWNLOAD_SIZE + 1)}
+    mock_resp_large_header.is_redirect = False
+
+    mock_session.get.return_value = mock_resp_large_header
+
+    assert client.download_file("https://api.smugmug.com/large.jpg", "/tmp/out") is False
+
+    # Test 2: Chunk stream exceeds MAX_DOWNLOAD_SIZE
+    mock_resp_large_stream = MagicMock()
+    mock_resp_large_stream.status_code = 200
+    mock_resp_large_stream.headers = {}
+    mock_resp_large_stream.is_redirect = False
+
+    # We yield chunks such that it will exceed the limit.
+    # To keep the test fast, we can mock MAX_DOWNLOAD_SIZE
+    with patch("src.config.MAX_DOWNLOAD_SIZE", 100), patch("src.api_client.MAX_DOWNLOAD_SIZE", 100, create=True):
+        # We need a chunk size larger than the mocked max size
+        mock_resp_large_stream.iter_content.return_value = [b"A" * 150]
+        mock_session.get.return_value = mock_resp_large_stream
+
+        with patch("tempfile.mkstemp") as mock_mkstemp, patch("os.fdopen") as mock_fdopen, patch("os.remove") as mock_remove:
+            mock_mkstemp.return_value = (42, "/tmp/mock.tmp")
+            mock_file = MagicMock()
+            mock_fdopen.return_value.__enter__.return_value = mock_file
+
+            assert client.download_file("https://api.smugmug.com/large_stream.jpg", "/tmp/out2") is False
