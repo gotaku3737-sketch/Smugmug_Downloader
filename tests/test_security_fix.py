@@ -80,21 +80,24 @@ def test_save_tokens_uses_secure_permissions():
     with patch("os.open") as mock_open:
         mock_open.return_value = 42 # dummy fd
         with patch("os.fdopen") as mock_fdopen:
-            mock_file = MagicMock()
-            mock_fdopen.return_value.__enter__.return_value = mock_file
+            with patch("os.fchmod") as mock_fchmod:
+                mock_file = MagicMock()
+                mock_fdopen.return_value.__enter__.return_value = mock_file
 
-            src.auth.save_tokens(tokens)
+                src.auth.save_tokens(tokens)
 
-            expected_flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-            if hasattr(os, "O_NOFOLLOW"):
-                expected_flags |= os.O_NOFOLLOW
+                expected_flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                if hasattr(os, "O_NOFOLLOW"):
+                    expected_flags |= os.O_NOFOLLOW
 
-            mock_open.assert_called_once_with(
-                src.auth.TOKEN_FILE,
-                expected_flags,
-                0o600
-            )
-            mock_fdopen.assert_called_once_with(42, "w")
+                mock_open.assert_called_once_with(
+                    src.auth.TOKEN_FILE,
+                    expected_flags,
+                    0o600
+                )
+                if hasattr(os, "fchmod"):
+                    mock_fchmod.assert_called_once_with(42, 0o600)
+                mock_fdopen.assert_called_once_with(42, "w")
 
 def test_download_file_prevents_ssrf():
     import sys
@@ -648,3 +651,34 @@ def test_download_file_enforces_max_download_size():
             mock_fdopen.return_value.__enter__.return_value = mock_file
 
             assert client.download_file("https://api.smugmug.com/large_stream.jpg", "/tmp/out2") is False
+
+def test_auth_save_tokens_enforces_permissions():
+    import os
+    import tempfile
+    import stat
+    from src.auth import save_tokens
+    import src.auth
+
+    fd, path = tempfile.mkstemp()
+    os.close(fd)
+
+    # Simulate an existing file with wide permissions
+    os.chmod(path, 0o644)
+
+    # Ensure it's actually 0o644 before we test (in case umask overrides, although chmod shouldn't)
+    st = os.stat(path)
+    assert stat.S_IMODE(st.st_mode) == 0o644
+
+    # We don't want it to actually print to console during tests if we can avoid it, but it's okay
+    # Let's mock console so it doesn't print
+    from unittest.mock import patch
+    with patch("src.auth.console.print"), patch("src.auth.TOKEN_FILE", path):
+        try:
+            save_tokens({"oauth_token": "test", "oauth_token_secret": "test_secret"})
+
+            # Verify permissions were tightened to 0o600
+            st = os.stat(path)
+            assert stat.S_IMODE(st.st_mode) == 0o600
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
