@@ -682,3 +682,29 @@ def test_auth_save_tokens_enforces_permissions():
         finally:
             if os.path.exists(path):
                 os.remove(path)
+
+def test_sanitize_dirname_truncates_long_names():
+    from src.downloader import sanitize_dirname
+    long_name = "a" * 300
+    safe_name = sanitize_dirname(long_name)
+    assert len(safe_name) == 255
+    assert safe_name == "a" * 255
+
+def test_get_image_filename_truncates_long_names():
+    from src.downloader import get_image_filename
+
+    # Test with provided long filename
+    long_filename = "b" * 300 + ".png"
+    image_dict = {"FileName": long_filename}
+    result = get_image_filename(image_dict)
+    assert len(result) == 255
+    assert result.endswith(".png")
+    assert result == "b" * 251 + ".png"
+
+    # Test with generated long filename
+    long_key = "c" * 300
+    image_dict = {"ImageKey": long_key, "Format": "JPG"}
+    result2 = get_image_filename(image_dict)
+    assert len(result2) == 255
+    assert result2.endswith(".jpg")
+    assert result2 == "c" * 251 + ".jpg"
