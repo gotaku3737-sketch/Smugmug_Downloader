@@ -56,6 +56,10 @@ def save_tokens(tokens):
             flags |= os.O_NOFOLLOW
 
         fd = os.open(TOKEN_FILE, flags, 0o600)
+        # Security enhancement: If the file already existed with wider permissions,
+        # os.open does not tighten them. Use fchmod to explicitly enforce 0o600.
+        if hasattr(os, "fchmod"):
+            os.fchmod(fd, 0o600)
         with os.fdopen(fd, "w") as f:
             json.dump(tokens, f, indent=2)
         console.print(

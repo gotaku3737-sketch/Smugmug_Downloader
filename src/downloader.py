@@ -40,7 +40,10 @@ def sanitize_dirname(name):
     # Replace unsafe chars with hyphens, collapse multiples
     safe = re.sub(r'[<>:"/\\|?*]', '-', name)
     safe = re.sub(r'-+', '-', safe).strip(' -.')
-    return safe or "untitled"
+
+    # Security fix: Limit directory name length to prevent filesystem errors
+    res = (safe or "untitled")[:255].rstrip(' -.')
+    return res or "untitled"
 
 
 def extract_image_key(image):
@@ -112,6 +115,18 @@ def get_image_filename(image):
                     "MOV": "mov", "TIFF": "tiff", "TIF": "tif"}
         ext = ext_map.get(fmt, "jpg")
         filename = f"{key}.{ext}"
+
+    # Security fix: Limit filename length to prevent filesystem errors (max 255 chars)
+    if len(filename) > 255:
+        name_part, ext_part = os.path.splitext(filename)
+        if len(ext_part) >= 255:
+            # If the extension itself is too long, we just truncate the whole string
+            filename = filename[:255]
+        else:
+            # Allocate space for extension, and truncate name part
+            max_name_len = 255 - len(ext_part)
+            filename = name_part[:max_name_len] + ext_part
+
     return filename
 
 

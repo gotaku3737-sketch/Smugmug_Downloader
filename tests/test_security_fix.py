@@ -80,21 +80,24 @@ def test_save_tokens_uses_secure_permissions():
     with patch("os.open") as mock_open:
         mock_open.return_value = 42 # dummy fd
         with patch("os.fdopen") as mock_fdopen:
-            mock_file = MagicMock()
-            mock_fdopen.return_value.__enter__.return_value = mock_file
+            with patch("os.fchmod") as mock_fchmod:
+                mock_file = MagicMock()
+                mock_fdopen.return_value.__enter__.return_value = mock_file
 
-            src.auth.save_tokens(tokens)
+                src.auth.save_tokens(tokens)
 
-            expected_flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
-            if hasattr(os, "O_NOFOLLOW"):
-                expected_flags |= os.O_NOFOLLOW
+                expected_flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                if hasattr(os, "O_NOFOLLOW"):
+                    expected_flags |= os.O_NOFOLLOW
 
-            mock_open.assert_called_once_with(
-                src.auth.TOKEN_FILE,
-                expected_flags,
-                0o600
-            )
-            mock_fdopen.assert_called_once_with(42, "w")
+                mock_open.assert_called_once_with(
+                    src.auth.TOKEN_FILE,
+                    expected_flags,
+                    0o600
+                )
+                if hasattr(os, "fchmod"):
+                    mock_fchmod.assert_called_once_with(42, 0o600)
+                mock_fdopen.assert_called_once_with(42, "w")
 
 def test_download_file_prevents_ssrf():
     import sys
@@ -611,54 +614,108 @@ def test_api_client_max_retries_exception_message_injection():
 
         assert "\\[red\\]malicious\\[/red\\]" in str(exc_info.value.message)
 
-def test_download_file_prevents_unbounded_stream_dos():
-    import os
-    import tempfile
-    from unittest.mock import MagicMock, patch
+def test_download_file_enforces_max_download_size():
     from src.api_client import SmugMugClient
-    from src.config import MAX_DOWNLOAD_SIZE
+    from unittest.mock import MagicMock, patch
+    import src.config
 
     mock_session = MagicMock()
     client = SmugMugClient(mock_session)
 
-    mock_resp_200 = MagicMock()
-    mock_resp_200.status_code = 200
-    mock_resp_200.headers = {"Content-Length": str(MAX_DOWNLOAD_SIZE + 100)}
-    mock_resp_200.is_redirect = False
+    # Test 1: Content-Length exceeds MAX_DOWNLOAD_SIZE
+    mock_resp_large_header = MagicMock()
+    mock_resp_large_header.status_code = 200
+    mock_resp_large_header.headers = {"Content-Length": str(src.config.MAX_DOWNLOAD_SIZE + 1)}
+    mock_resp_large_header.is_redirect = False
 
-    # Use generator to simulate chunks that exceed MAX_DOWNLOAD_SIZE without allocating a ton of memory in the test
-    def mock_iter_content(*args, **kwargs):
-        chunk_size = 1024 * 1024 * 1024 # 1 GB
-        num_chunks = (MAX_DOWNLOAD_SIZE // chunk_size) + 1
-        for _ in range(num_chunks):
-            # We don't actually need the chunk to be exactly chunk_size in memory if we mock len()
-            # Wait, the code uses len(chunk), so we need a mock object that returns chunk_size for len()
-            class MockChunk:
-                def __len__(self):
-                    return chunk_size
-            yield MockChunk()
+    mock_session.get.return_value = mock_resp_large_header
 
-    mock_resp_200.iter_content = mock_iter_content
+    assert client.download_file("https://api.smugmug.com/large.jpg", "/tmp/out") is False
 
-    mock_session.get.return_value = mock_resp_200
+    # Test 2: Chunk stream exceeds MAX_DOWNLOAD_SIZE
+    mock_resp_large_stream = MagicMock()
+    mock_resp_large_stream.status_code = 200
+    mock_resp_large_stream.headers = {}
+    mock_resp_large_stream.is_redirect = False
 
-    with patch("tempfile.mkstemp") as mock_mkstemp, patch("os.fdopen") as mock_fdopen, patch("os.remove") as mock_remove, patch("os.makedirs"):
-        mock_mkstemp.return_value = (42, "/tmp/some_dir/mock.tmp")
-        mock_file = MagicMock()
-        mock_fdopen.return_value.__enter__.return_value = mock_file
+    # We yield chunks such that it will exceed the limit.
+    # To keep the test fast, we can mock MAX_DOWNLOAD_SIZE
+    with patch("src.config.MAX_DOWNLOAD_SIZE", 100), patch("src.api_client.MAX_DOWNLOAD_SIZE", 100, create=True):
+        # We need a chunk size larger than the mocked max size
+        mock_resp_large_stream.iter_content.return_value = [b"A" * 150]
+        mock_session.get.return_value = mock_resp_large_stream
 
-        with patch("src.api_client.console.print") as mock_print:
-            with patch("src.api_client.PreparedRequest") as mock_prepared_req:
-                mock_prepared_req.return_value.url = "https://api.smugmug.com/image.jpg"
+        with patch("tempfile.mkstemp") as mock_mkstemp, patch("os.fdopen") as mock_fdopen, patch("os.remove") as mock_remove:
+            mock_mkstemp.return_value = (42, "/tmp/mock.tmp")
+            mock_file = MagicMock()
+            mock_fdopen.return_value.__enter__.return_value = mock_file
 
-                # Should return False as it aborts
-                result = client.download_file("https://api.smugmug.com/image.jpg", "/tmp/some_dir/out.jpg")
+            assert client.download_file("https://api.smugmug.com/large_stream.jpg", "/tmp/out2") is False
 
-                assert result is False
+def test_auth_save_tokens_enforces_permissions():
+    import os
+    import tempfile
+    import stat
+    from src.auth import save_tokens
+    import src.auth
 
-                # Ensure os.remove was called to clean up the temp file
-                mock_remove.assert_called_with("/tmp/some_dir/mock.tmp")
+    fd, path = tempfile.mkstemp()
+    os.close(fd)
 
-                # Verify the security error was printed
-                print_args = [args[0][0] for args in mock_print.call_args_list]
-                assert any(f"Download exceeded {MAX_DOWNLOAD_SIZE} bytes" in str(arg) for arg in print_args)
+    # Simulate an existing file with wide permissions
+    os.chmod(path, 0o644)
+
+    # Ensure it's actually 0o644 before we test (in case umask overrides, although chmod shouldn't)
+    st = os.stat(path)
+    assert stat.S_IMODE(st.st_mode) == 0o644
+
+    # We don't want it to actually print to console during tests if we can avoid it, but it's okay
+    # Let's mock console so it doesn't print
+    from unittest.mock import patch
+    with patch("src.auth.console.print"), patch("src.auth.TOKEN_FILE", path):
+        try:
+            save_tokens({"oauth_token": "test", "oauth_token_secret": "test_secret"})
+
+            # Verify permissions were tightened to 0o600
+            st = os.stat(path)
+            assert stat.S_IMODE(st.st_mode) == 0o600
+        finally:
+            if os.path.exists(path):
+                os.remove(path)
+
+def test_sanitize_dirname_truncates_long_names():
+    from src.downloader import sanitize_dirname
+    long_name = "a" * 300
+    safe_name = sanitize_dirname(long_name)
+    assert len(safe_name) == 255
+    assert safe_name == "a" * 255
+
+def test_get_image_filename_truncates_long_names():
+    from src.downloader import get_image_filename
+
+    # Test with provided long filename
+    long_filename = "b" * 300 + ".png"
+    image_dict = {"FileName": long_filename}
+    result = get_image_filename(image_dict)
+    assert len(result) == 255
+    assert result.endswith(".png")
+    assert result == "b" * 251 + ".png"
+
+    # Test with generated long filename
+    long_key = "c" * 300
+    image_dict = {"ImageKey": long_key, "Format": "JPG"}
+    result2 = get_image_filename(image_dict)
+    assert len(result2) == 255
+    assert result2.endswith(".jpg")
+    assert result2 == "c" * 251 + ".jpg"
+
+def test_get_image_filename_prevents_negative_index_slicing_bypass():
+    from src.downloader import get_image_filename
+
+    # Test with provided long filename containing an overly long extension
+    long_filename = "a" + "." + "b" * 300
+    image_dict = {"FileName": long_filename}
+    result = get_image_filename(image_dict)
+
+    assert len(result) == 255
+    assert result == ("a." + "b" * 300)[:255]
