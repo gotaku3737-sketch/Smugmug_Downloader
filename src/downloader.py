@@ -120,7 +120,7 @@ def get_image_filename(image):
     if len(filename) > 255:
         name_part, ext_part = os.path.splitext(filename)
         if len(ext_part) >= 255:
-            # If the extension itself is too long, just truncate the entire string
+            # If the extension itself is too long, we just truncate the whole string
             filename = filename[:255]
         else:
             # Allocate space for extension, and truncate name part
