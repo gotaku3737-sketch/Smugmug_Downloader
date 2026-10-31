@@ -12,17 +12,29 @@ All agents operating in this repository must strictly adhere to these rules:
 1. **EAFP over LBYL for File Operations**:
    - Never use `os.path.exists()` before performing file opens, reads, or deletions.
    - Always use the **Easier to Ask for Forgiveness than Permission (EAFP)** pattern (`try...except OSError`) to eliminate Time-Of-Check to Time-Of-Use (TOCTOU) race conditions.
-2. **Terminal Output Sanitization**:
-   - Always wrap user-controlled, external API, or exception strings with `rich.markup.escape()` before passing them into `console.print`, table cells, or progress tasks to prevent terminal injection.
+2. **Terminal Output & Exception Sanitization**:
+   - Always wrap user-controlled, external API, error bodies, or exception strings with `rich.markup.escape()` before passing them into `console.print`, table cells, progress tasks, or embedding them into custom exception classes (e.g. `SmugMugAPIError`) to prevent terminal injection.
 3. **API URL & Path Parameter Encoding**:
    - Never use direct string interpolation for API endpoint path variables (e.g., `user_id`, `album_key`, `image_key`).
    - Use `urllib.parse.quote(param, safe="")` for all parameter substitutions to protect against API path traversal and SSRF via endpoint injection.
 4. **SSRF & Token Leak Prevention**:
    - Enforce domain checks verifying that outbound requests and HTTP redirect targets stay within `*.smugmug.com`.
    - Normalize target URLs with `PreparedRequest` to prevent parser discrepancy exploits.
-5. **Secure Token Storage**:
-   - Sensitive files (e.g., `.smugmug_tokens.json`) must be created atomically with restrictive permissions `0600` via `os.open` with flags `os.O_CREAT | os.O_WRONLY | os.O_TRUNC`.
-6. **Input Validation**:
+   - Handle HTTP redirects manually (`allow_redirects=False`) to prevent leaking OAuth authorization headers.
+   - Ensure all relative API endpoints start strictly with `/`.
+5. **Secure Token Storage & Symlink Defense**:
+   - Sensitive files (e.g., `.smugmug_tokens.json`) must be created atomically with restrictive permissions `0o600` via `os.open` with flags `os.O_CREAT | os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW`.
+   - Explicitly enforce permissions with `os.fchmod(fd, 0o600)` immediately after opening to tighten permissions even if the file pre-existed.
+6. **Path Traversal & Filesystem DoS Bounds**:
+   - Sanitize all directory and image filenames using `os.path.basename` and explicitly reject `.` / `..`.
+   - Enforce a 255-character maximum length on directory and file names with extension preservation to prevent `OSError: File name too long` filesystem DoS attacks.
+   - Guard against negative index slicing bypasses when file extensions meet or exceed length limits.
+7. **Disk Exhaustion & Bounded Streams**:
+   - Guard streaming downloads against disk exhaustion DoS by enforcing `MAX_DOWNLOAD_SIZE` limits on `Content-Length` headers and tracking accumulated bytes during chunk iteration.
+8. **Clean CLI Interruption & Stack Trace Protection**:
+   - Wrap CLI entry points in global exception handlers to prevent sensitive credential and path leaks.
+   - Explicitly handle `KeyboardInterrupt` / SIGINT with a sanitized cancellation message and standard exit code `130`.
+9. **Input Validation**:
    - Enforce strict format checks on external inputs (e.g. OAuth verification PIN must be exactly 6 numeric digits).
 
 ---
@@ -37,7 +49,7 @@ All agents operating in this repository must strictly adhere to these rules:
    - The test suite contains both unit tests (`tests/test_*.py`) and Behavior-Driven Development specifications (`tests/step_defs/` and `features/`).
    - Any new feature or bug fix must include corresponding unit tests and Gherkin feature scenarios.
 3. **Zero Regression Standard**:
-   - All tests must pass before staging or committing changes.
+   - All 115+ automated tests must pass before staging or committing changes.
 
 ---
 
@@ -51,13 +63,14 @@ All agents operating in this repository must strictly adhere to these rules:
 When configuring subagents or assigning scoped tasks, use these role definitions:
 
 ### Role 1: Security & Sentinel Auditor
-* **Focus**: Inspecting code against `.jules/sentinel.md` to prevent regressions in SSRF, path traversal, terminal injection, and TOCTOU.
+* **Focus**: Inspecting code against `.jules/sentinel.md` to prevent regressions in SSRF, path traversal, terminal injection, disk exhaustion, symlink traversal, and TOCTOU.
 * **System Instruction**:
   ```markdown
   You are the Security Auditor for SmugMug Downloader.
   - Review all proposed changes in `src/` against `.jules/sentinel.md`.
   - Ensure file operations use atomic EAFP patterns (`try...except OSError`).
-  - Verify that Rich markup escaping is applied to all console outputs.
+  - Verify that Rich markup escaping is applied to all console outputs and exception messages.
+  - Check that path bounds (255 chars), stream bounds (MAX_DOWNLOAD_SIZE), and symlink flags (os.O_NOFOLLOW) are respected.
   - Add regression test cases to `tests/test_security_fix.py` for any newly identified vulnerability or edge case.
   - Do not alter CLI business workflows without coordinating with the Feature Developer.
   ```
@@ -74,12 +87,15 @@ When configuring subagents or assigning scoped tasks, use these role definitions
   ```
 
 ### Role 3: Core Engine & CLI Developer
-* **Focus**: Building roadmap features in `src/` (e.g. rate limit telemetry, bandwidth throttling, video checksumming).
+* **Focus**: Building roadmap features in `src/` following the phased milestones in `PLAN.md`.
 * **System Instruction**:
   ```markdown
   You are the Core Developer for SmugMug Downloader.
-  - Implement prioritized items from `PLAN.md`.
-  - Modify core modules in `src/` (`downloader.py`, `api_client.py`, `tracker.py`, `cli.py`).
+  - Implement prioritized items from `PLAN.md`:
+    - Phase 1: Pre-flight disk space check, adaptive rate limit telemetry, bandwidth throttling (`--max-rate`).
+    - Phase 2: Resumable chunk downloads (HTTP Range), video container validation, folder hierarchy preservation (`--preserve-folders`).
+    - Phase 3: Granular filters (`--since`, media filters), dry-run mode (`--dry-run`), audit manifests, multi-profile support.
+  - Modify core modules in `src/` (`downloader.py`, `api_client.py`, `tracker.py`, `cli.py`, `config.py`).
   - Ensure code changes provide clear interfaces and error handling for the BDD Engineer to test.
   ```
 
@@ -90,7 +106,7 @@ When configuring subagents or assigning scoped tasks, use these role definitions
   You are the Release Coordinator for SmugMug Downloader.
   - Keep `README.md` and `PLAN.md` updated with the latest CLI flags, architecture details, and test counts.
   - Verify package metadata in `pyproject.toml`, `setup.py`, and `src/__init__.py`.
-  - Ensure working tree is clean and all 100+ tests pass before pushes.
+  - Ensure working tree is clean and all 115+ tests pass before pushes.
   ```
 
 ---
@@ -105,8 +121,10 @@ Work on: <TASK_DESCRIPTION> (see PLAN.md for context).
 Guidelines:
 1. Adhere strictly to the Security Invariants in AGENTS.md and .jules/sentinel.md:
    - Use EAFP blocks for all file checks/operations.
-   - Escape all external outputs to Rich.
+   - Escape all external outputs, error bodies, and exception messages to Rich.
    - Quote path parameters for API endpoints.
+   - Bound file/directory names to 255 characters and streaming downloads to MAX_DOWNLOAD_SIZE.
+   - Apply secure permissions (`0o600`, `os.O_NOFOLLOW`, `os.fchmod`) to sensitive files.
 2. If changing user-facing behaviors or CLI arguments, update:
    - `features/<feature>.feature` and `tests/step_defs/`
    - `README.md` and `PLAN.md`
