@@ -37,6 +37,7 @@ MAX_RETRIES = 3
 MAX_DOWNLOAD_SIZE = 50 * 1024 * 1024 * 1024  # 50 GB limit per file to prevent DoS via disk exhaustion
 RETRY_BACKOFF = 2  # seconds, multiplied on each retry
 PAGE_SIZE = 100  # items per API page request
+MAX_DOWNLOAD_SIZE = 50 * 1024 * 1024 * 1024  # 50 GB limit per file to prevent DoS via unbounded streams
 
 
 def get_api_credentials():
