@@ -708,3 +708,14 @@ def test_get_image_filename_truncates_long_names():
     assert len(result2) == 255
     assert result2.endswith(".jpg")
     assert result2 == "c" * 251 + ".jpg"
+
+def test_get_image_filename_prevents_negative_index_slicing_bypass():
+    from src.downloader import get_image_filename
+
+    # Test with provided long filename containing an overly long extension
+    long_filename = "a" + "." + "b" * 300
+    image_dict = {"FileName": long_filename}
+    result = get_image_filename(image_dict)
+
+    assert len(result) == 255
+    assert result == ("a." + "b" * 300)[:255]
