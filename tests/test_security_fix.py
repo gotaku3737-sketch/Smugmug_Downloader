@@ -42,9 +42,7 @@ def test_get_api_credentials_uses_password_masking():
 
         # Ensure env vars are not set to trigger prompt
         with patch.dict(os.environ, {}, clear=True):
-            # Also ensure static constants are empty
-            with patch("src.config.API_KEY", ""), patch("src.config.API_SECRET", ""):
-                src.config.get_api_credentials()
+            src.config.get_api_credentials()
 
         # Check that input was called with password=True
         assert mock_console_inst.input.call_count == 2
