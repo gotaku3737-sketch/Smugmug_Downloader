@@ -1,20 +1,12 @@
 """
 Configuration for SmugMug Downloader.
 
-API credentials can be set in three ways (in order of priority):
+API credentials can be set in two ways (in order of priority):
 1. Environment variables: SMUGMUG_API_KEY and SMUGMUG_API_SECRET
-2. Static constants below (edit these directly)
-3. Interactive CLI prompt (if neither of the above is set)
+2. Interactive CLI prompt (if neither of the above is set)
 """
 
 import os
-
-# ============================================================================
-# STATIC API CREDENTIALS — Edit these if you prefer not to use env vars
-# ============================================================================
-API_KEY = ""
-API_SECRET = ""
-# ============================================================================
 
 # SmugMug API endpoints
 BASE_URL = "https://api.smugmug.com"
@@ -41,7 +33,7 @@ PAGE_SIZE = 100  # items per API page request
 
 def get_api_credentials():
     """
-    Get API credentials from env vars, static constants, or interactive prompt.
+    Get API credentials from env vars or interactive prompt.
 
     Returns:
         tuple: (api_key, api_secret)
@@ -53,11 +45,7 @@ def get_api_credentials():
     if api_key and api_secret:
         return api_key, api_secret
 
-    # Priority 2: Static constants at top of this file
-    if API_KEY and API_SECRET:
-        return API_KEY, API_SECRET
-
-    # Priority 3: Interactive prompt
+    # Priority 2: Interactive prompt
     from rich.console import Console
     console = Console()
     console.print(
@@ -70,8 +58,7 @@ def get_api_credentials():
     )
     console.print(
         "[dim]Tip: Set SMUGMUG_API_KEY and SMUGMUG_API_SECRET as environment "
-        "variables, or edit the constants in src/config.py to "
-        "avoid this prompt.[/dim]\n"
+        "variables to avoid this prompt.[/dim]\n"
     )
 
     api_key = console.input("[bold]Enter your SmugMug API Key: [/bold]", password=True).strip()
