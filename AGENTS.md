@@ -97,6 +97,7 @@ When configuring subagents or assigning scoped tasks, use these role definitions
     - Phase 1: Pre-flight disk space check, adaptive rate limit telemetry, bandwidth throttling (`--max-rate`).
     - Phase 2: Resumable chunk downloads (HTTP Range), video container validation, folder hierarchy preservation (`--preserve-folders`).
     - Phase 3: Granular filters (`--since`, media filters), dry-run mode (`--dry-run`), audit manifests, multi-profile support.
+    - Phase 4: Security & defense-in-depth hardening (OS keychain storage + `--logout`, `MAX_WORKERS`/`MAX_PAGES` bounds, `os.O_NOFOLLOW` symlink-safe reads & permission auditing, `bandit`/`pip-audit` checks).
   - Modify core modules in `src/` (`downloader.py`, `api_client.py`, `tracker.py`, `cli.py`, `config.py`).
   - Ensure code changes provide clear interfaces and error handling for the BDD Engineer to test.
   ```

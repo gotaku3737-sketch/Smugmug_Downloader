@@ -182,7 +182,7 @@ To run only the BDD feature tests in `features/`:
 
 ## Roadmap & Architecture Plan
 
-Detailed architectural roadmaps, planned milestones (pre-flight disk space checks, adaptive rate limiting, resumable HTTP `Range` downloads, folder hierarchy preservation, and exportable audit manifests), and agent instructions are documented in:
+Detailed architectural roadmaps, planned milestones (pre-flight disk space checks, adaptive rate limiting, resumable HTTP `Range` downloads, folder hierarchy preservation, exportable audit manifests, and Phase 4 security hardening including OS keychain integration, `--logout`, concurrency/pagination bounds, symlink-safe reads, and SAST/dependency scanning), and agent instructions are documented in:
 - [PLAN.md](PLAN.md) — Architectural overview, hardening status, and phased milestone roadmap.
 - [AGENTS.md](AGENTS.md) — Multi-agent coordination guidelines, sentinel rules, and role templates.
 - [.jules/sentinel.md](.jules/sentinel.md) — Security regression history and mitigation patterns.
