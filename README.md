@@ -7,10 +7,10 @@ A Python CLI tool to download **all galleries (albums)** from a SmugMug account 
 - **Parallel downloads** — utilizes concurrent thread workers (`-w` / `--workers`) for high-speed file transfers.
 - **Integrity verification** — automatically validates downloaded files using MD5 checksums (with self-healing retries on mismatches).
 - **Advanced global progress** — displays real-time backup metrics via `rich`, including overall transfer speed (MB/s), total backup size, aggregate ETA, and transient sub-task download bars.
-- **OAuth 1.0a authentication** — one-time browser-based authorization; OAuth access tokens are cached in `.smugmug_tokens.json` with strict file permissions (`0o600`, `os.O_NOFOLLOW`, `os.fchmod`).
+- **OAuth 1.0a authentication** — one-time out-of-band browser authorization (30s OAuth request timeouts, password-masked credential/PIN prompts via `password=True`); OAuth access tokens are cached in `~/.smugmug_tokens.json` with strict file permissions (`0o600`, `os.O_NOFOLLOW`, `os.fchmod`).
 - **Full account download** — discovers and downloads every album tied to the user's account.
 - **Album filtering** — download specific albums by name matching (`-a` / `--album`).
-- **Resume support** — tracks per-image download state in a JSON file (`.smugmug_download_state.json`); interrupted downloads resume seamlessly.
+- **Resume support** — tracks per-image download state in `download_state.json` inside the output directory; interrupted downloads resume seamlessly.
 - **Retry with exponential backoff** — automatically retries on rate limits (HTTP 429), server errors (HTTP 500/503), and connection failures.
 - **Original quality** — downloads full-resolution archived photos and videos.
 - **Hardened Security & Sentinel Protection** — robust protections against:
@@ -33,6 +33,7 @@ Smugmug_Downloader/
 ├── requirements.txt                 # Python runtime and testing dependencies
 ├── setup.py                         # Package installation script (defines `smd` and `smugmug-download`)
 ├── pyproject.toml                   # Project metadata and setuptools configuration
+├── pytest.ini                       # Pytest configuration (pythonpath = .)
 ├── PLAN.md                          # Architecture overview, hardening status & roadmap plan
 ├── AGENTS.md                        # Multi-agent coordination rules, roles & instructions
 ├── .env.example                     # API credential template
@@ -54,6 +55,7 @@ Smugmug_Downloader/
 │   ├── downloader.py                # Concurrent download engine (EAFP file checks & progress reporting)
 │   └── cli.py                       # CLI parsing, command dispatch & SIGINT handling
 └── tests/                           # Test suite (115 automated tests)
+    ├── __init__.py
     ├── step_defs/                   # BDD step definition files for pytest-bdd (23 scenarios)
     │   ├── test_api_steps.py
     │   ├── test_authentication_steps.py
@@ -63,7 +65,7 @@ Smugmug_Downloader/
     │   └── test_tracking_steps.py
     ├── test_tracker.py              # Unit tests for DownloadTracker (21 tests)
     ├── test_api_client.py           # Unit tests for SmugMugClient (14 tests)
-    ├── test_downloader.py           # Unit tests for download orchestration (30 tests)
+    ├── test_downloader.py           # Unit tests for dirname/filename sanitization & key extraction (30 tests)
     └── test_security_fix.py         # Unit tests for Sentinel security hardening (27 tests)
 ```
 
@@ -104,46 +106,52 @@ smugmug-download
 ```
 
 On first run, the app will:
-1. Prompt for API credentials (if not already configured)
-2. Prompt for destination folder (default: `./smugmug_downloads`)
-3. Open a browser window to authorize access via OAuth 1.0a and prompt for the 6-digit PIN
-4. Validate the 6-digit PIN, securely save access tokens to `.smugmug_tokens.json` (`0o600`, `os.O_NOFOLLOW`), and start downloading all albums
+1. Prompt for API credentials with masked input (if `SMUGMUG_API_KEY` / `SMUGMUG_API_SECRET` are not set)
+2. Prompt for destination folder (default: `./smugmug_downloads`, unless `-o` / `--output-dir` is passed)
+3. Display the OAuth 1.0a authorization URL to open in your browser and prompt for the 6-digit verification PIN (masked)
+4. Validate the 6-digit PIN, securely save access tokens to `~/.smugmug_tokens.json` (`0o600`, `os.O_NOFOLLOW`, `os.fchmod`), and start downloading all albums
 
-### Specifying concurrent workers
+### Specifying concurrent workers (`-w` / `--workers`)
 
 To speed up downloads, adjust the worker thread count (default: 3):
 ```bash
 smd -w 5
 ```
 
-### Download to a specific directory
+### Download to a specific directory (`-o` / `--output-dir`)
 
 ```bash
 smd -o ~/SmugMug_Backup
 ```
 
-### Download a specific album
+### Download a specific album (`-a` / `--album`)
 
 ```bash
 smd -a "Vacation 2024"
 ```
 
-### List all albums (no download)
+### List all albums (`--list-albums`, no download)
 
 ```bash
 smd --list-albums
 ```
 
-### Check download progress (No API Auth Required)
+### Check download progress (`--status`, no API auth required)
 
 ```bash
 smd --status -o ~/SmugMug_Backup
 ```
 
-### Reset tracking state (No API Auth Required)
+### Reset tracking state (`--reset`, no API auth required)
 
 ```bash
 smd --reset -o ~/SmugMug_Backup
+```
+
+### Check CLI version (`--version`)
+
+```bash
+smd --version
 ```
 
 ### Resume an interrupted download

@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A Python CLI tool to download all galleries from a SmugMug account using the SmugMug API v2."
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 dependencies = [
     "requests>=2.31.0",
     "requests-oauthlib>=1.3.1",
@@ -18,6 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
+smd = "src.cli:main"
 smugmug-download = "src.cli:main"
 
 [tool.setuptools.packages.find]

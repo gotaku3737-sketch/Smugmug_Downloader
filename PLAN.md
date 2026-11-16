@@ -8,10 +8,10 @@ This document outlines the current architectural foundation, completed hardening
 
 The SmugMug Downloader is designed as a modular, resilient CLI backup utility built with Python:
 
-- **CLI Layer (`src/cli.py`)**: Entry point for command parsing, argument dispatch (`-a`, `-w`, `-o`, `--list-albums`, `--status`, `--reset`), clean `KeyboardInterrupt` / SIGINT handling (exit code 130), and top-level error sanitization to prevent stack trace information leaks.
-- **Authentication & Credential Layer (`src/auth.py`, `src/config.py`)**: Manages OAuth 1.0a 3-legged handshake, PIN format validation, and atomic token caching with strict permissions (`0o600` via `os.open` with `os.O_NOFOLLOW` and `os.fchmod`).
+- **CLI Layer (`src/cli.py`)**: Entry point for command parsing, argument dispatch (`-a`/`--album`, `-w`/`--workers`, `-o`/`--output-dir`, `--list-albums`, `--status`, `--reset`, `--version`), clean `KeyboardInterrupt` / SIGINT handling (exit code 130), and top-level error sanitization to prevent stack trace information leaks.
+- **Authentication & Credential Layer (`src/auth.py`, `src/config.py`)**: Manages OAuth 1.0a 3-legged out-of-band handshake (`callback_uri="oob"`) with 30s request timeouts, password-masked CLI credential/PIN prompts (`password=True`), 6-digit PIN format validation, and atomic token caching at `~/.smugmug_tokens.json` with strict permissions (`0o600` via `os.open` with `os.O_NOFOLLOW` and `os.fchmod`).
 - **API Client Layer (`src/api_client.py`)**: Interacts with SmugMug API v2. Handles automatic cursor-based pagination, exponential backoff retries (HTTP 429, 500, 503), domain-whitelisted redirect tracking, streaming downloads via `tempfile.mkstemp`, and disk exhaustion protection (`MAX_DOWNLOAD_SIZE`).
-- **State & Tracking Engine (`src/tracker.py`)**: Maintains a persistent per-album and per-image download status in `.smugmug_download_state.json` with thread-safe atomic writes (`tempfile.mkstemp` + `os.replace`) and EAFP-based state loading.
+- **State & Tracking Engine (`src/tracker.py`)**: Maintains a persistent per-album and per-image download status in `download_state.json` inside the target output directory with thread-safe atomic writes (`tempfile.mkstemp` + `os.replace`) and EAFP-based state loading.
 - **Download Orchestrator (`src/downloader.py`)**: Manages thread pool concurrency, Rich live multi-progress bars, path length sanitization (255-character truncation), MD5 file integrity validation, and EAFP-based file existence verification.
 
 ---
@@ -49,8 +49,9 @@ The SmugMug Downloader is designed as a modular, resilient CLI backup utility bu
   - Atomic temporary file creation with `tempfile.mkstemp` and `os.replace`.
   - Secure permission creation flags on token cache (`os.O_CREAT | os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW`) followed by `os.fchmod(fd, 0o600)` to ensure strict permissions even on existing files.
   - Removal of pre-checks (`os.path.exists`) across `downloader.py`, `tracker.py`, `auth.py`, and `api_client.py` in favor of atomic `try...except OSError` (EAFP).
-- [x] **Input Validation**:
+- [x] **Input Validation & Prompt Hardening**:
   - Strict 6-digit numeric validation for OAuth verification PINs.
+  - Password-masked interactive prompts (`password=True`) for API credentials and OAuth PINs, plus 30s timeouts on OAuth token requests.
 - [x] **No Hardcoded Credentials**: Removal of static `API_KEY` and `API_SECRET` fallback constants from `src/config.py`, enforcing credential provision exclusively via `SMUGMUG_API_KEY` / `SMUGMUG_API_SECRET` environment variables or masked interactive runtime prompts.
 
 ---
@@ -66,10 +67,10 @@ The codebase is covered by **115 automated tests** (100% passing):
   - `features/download_tracking.feature` (5 scenarios: state creation, skipping, reset, EAFP loading, disk verification)
   - `features/integrity.feature` (2 scenarios: MD5 validation and corruption recovery)
 - **Unit & Security Suites**: 92 focused test cases:
-  - `tests/test_api_client.py` (pagination, request lifecycle, download streaming)
-  - `tests/test_downloader.py` (dirname sanitization, key extraction, filename truncation, worker flows)
-  - `tests/test_tracker.py` (JSON persistence, thread safety, state recovery, reporting)
-  - `tests/test_security_fix.py` (SSRF, redirects, parser discrepancies, terminal injection, TOCTOU, path traversal, unbounded streams, permission tightening, negative slicing)
+  - `tests/test_api_client.py` (14 tests: pagination, request lifecycle, download streaming)
+  - `tests/test_downloader.py` (30 tests: dirname sanitization, key extraction, filename resolution, format mappings, path traversal sanitization)
+  - `tests/test_tracker.py` (21 tests: JSON persistence, thread safety, state recovery, reporting)
+  - `tests/test_security_fix.py` (27 tests: SSRF, redirects, parser discrepancies, terminal injection, TOCTOU, filename truncation, worker EAFP checks, password masking, OAuth timeouts, unbounded streams, permission tightening, negative slicing)
 
 Execution command:
 ```bash

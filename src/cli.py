@@ -114,7 +114,7 @@ def main():
             console.print("[green]✓ Download state has been reset.[/green]")
             return
 
-        # Get API credentials (env vars → static constants → prompt)
+        # Get API credentials (env vars → interactive prompt)
         try:
             api_key, api_secret = get_api_credentials()
         except SystemExit:
