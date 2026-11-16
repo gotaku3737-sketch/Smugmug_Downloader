@@ -18,7 +18,7 @@ Feature: Authentication
   Scenario: API Key and Secret resolution
     Given environment variables for API key and secret are set
     When the application initializes configuration
-    Then it should use the environment variables over static constants
+    Then it should resolve credentials from the environment variables without prompting
 
   Scenario: Rejecting invalid OAuth verification PIN
     Given the user is prompted for an OAuth verification code

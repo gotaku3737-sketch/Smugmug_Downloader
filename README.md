@@ -19,7 +19,7 @@ A Python CLI tool to download **all galleries (albums)** from a SmugMug account 
   - **Terminal Output Injection**: Complete Rich markup escaping across console outputs, table cells, progress indicators, API error bodies (e.g. 403 responses), and custom exception messages.
   - **Disk Storage Exhaustion (DoS)**: Streaming download bounds via `MAX_DOWNLOAD_SIZE` limits (50 GB per file) and byte-tracking during chunk iteration.
   - **TOCTOU Race Condition Mitigation**: EAFP patterns (`try...except OSError`) for file operations and state loading, atomic temp downloads with `tempfile.mkstemp` and `os.replace`.
-  - **Secure Token Storage**: Atomic token cache creation with `os.open` flags `os.O_CREAT | os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW` and explicit `os.fchmod(fd, 0o600)`.
+  - **Secure Token & Credential Handling**: Atomic token cache creation with `os.open` flags `os.O_CREAT | os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW` and explicit `os.fchmod(fd, 0o600)`, plus exclusion of static `API_KEY` / `API_SECRET` source constants in favor of environment variables or masked interactive prompts.
   - **Clean CLI Interruption**: Graceful SIGINT / `KeyboardInterrupt` interception with exit code `130`, eliminating sensitive stack trace and file path disclosure.
   - **Input Validation & FIPS Compliance**: Strict 6-digit numeric verification for OAuth PINs and `usedforsecurity=False` on MD5 hashing operations.
 
@@ -91,7 +91,6 @@ Set your credentials via **one of** these methods:
 | Method | How |
 |---|---|
 | **Environment variables** | `export SMUGMUG_API_KEY=... SMUGMUG_API_SECRET=...` |
-| **Static constants** | Edit `API_KEY` and `API_SECRET` in `src/config.py` |
 | **Interactive prompt** | Run the application — it will prompt for missing keys |
 
 ## Usage

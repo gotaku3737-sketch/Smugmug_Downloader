@@ -51,6 +51,7 @@ The SmugMug Downloader is designed as a modular, resilient CLI backup utility bu
   - Removal of pre-checks (`os.path.exists`) across `downloader.py`, `tracker.py`, `auth.py`, and `api_client.py` in favor of atomic `try...except OSError` (EAFP).
 - [x] **Input Validation**:
   - Strict 6-digit numeric validation for OAuth verification PINs.
+- [x] **No Hardcoded Credentials**: Removal of static `API_KEY` and `API_SECRET` fallback constants from `src/config.py`, enforcing credential provision exclusively via `SMUGMUG_API_KEY` / `SMUGMUG_API_SECRET` environment variables or masked interactive runtime prompts.
 
 ---
 

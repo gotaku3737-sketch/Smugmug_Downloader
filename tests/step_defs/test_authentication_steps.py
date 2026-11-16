@@ -88,7 +88,7 @@ def init_config():
     pass
 
 
-@then("it should use the environment variables over static constants")
+@then("it should resolve credentials from the environment variables without prompting")
 def use_env_vars():
     from src.config import get_api_credentials
     key, secret = get_api_credentials()

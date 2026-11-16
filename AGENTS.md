@@ -36,6 +36,8 @@ All agents operating in this repository must strictly adhere to these rules:
    - Explicitly handle `KeyboardInterrupt` / SIGINT with a sanitized cancellation message and standard exit code `130`.
 9. **Input Validation**:
    - Enforce strict format checks on external inputs (e.g. OAuth verification PIN must be exactly 6 numeric digits).
+10. **No Hardcoded Credentials**:
+   - Never define static credential variables or placeholders (e.g., `API_KEY`, `API_SECRET`) in source files. Require secrets exclusively via environment variables or masked interactive CLI prompts.
 
 ---
 
